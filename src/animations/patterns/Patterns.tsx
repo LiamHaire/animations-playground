@@ -174,7 +174,7 @@ const NOW_OUT_AT = NOW_AT + writeMs(NOW) + PAIR_HOLD_MS;
 const LOOKUP_AT = NOW_AT + writeMs(NOW);
 const LOOKUP_HOLD_MS = 500;
 const ZOOM_AT = LOOKUP_AT + LOOKUP_HOLD_MS;
-const ZOOM_MS = 750;
+const ZOOM_MS = 1100;
 // Liam's storyboard (Figma 259:312 / 310 / 353 / 522): Earth (earth.svg, 259:577) 382px across in the middle of the
 // frame; the meteor comes in level from the right and strikes its right-hand side; the explosion (boom.svg, 259:603,
 // 939x921) bursts out over the planet. The jungle zooms out through the middle of the frame, Earth's centre.
@@ -182,14 +182,24 @@ const EARTH_W = 382;
 const EARTH_AT_XY = [960, 540] as const; // its centre in the frame
 const SPOT_XY = EARTH_AT_XY; // where the zoom goes through
 const IMPACT_XY = [1100, 530] as const; // on the land on the right-hand side of the planet, where the meteor lands
-// The zoom is two frames in turn, over the dark: the jungle pulls away and fades out, then space fades in as it settles.
-const JUNGLE_OUT_MS = 360; // the jungle shrinks and fades out over the start of the zoom...
-const JUNGLE_END_SCALE = 0.3; // ...to this size, gone before it's a speck
-const SPACE_IN_AT = 400; // ms into the zoom: space fades in once the jungle has gone...
-const SPACE_START_SCALE = 2.2; // ...still pulling back, from this size to its resting size as the zoom lands
-const EARTH_LINES_AT = 520; // ms into the zoom: Earth's outlines ink in a touch behind its fills, ...
-const EARTH_LINES_MS = 230; // ...done as the zoom lands
-const METEOR_AT = ZOOM_AT + ZOOM_MS + 250; // a beat on Earth, then the meteor
+// The jungle becomes the planet. The camera pulls back from the scene through its surroundings (a picture three frames
+// by three), which round off into a circle as they keep shrinking and fade, handing over to Earth underneath: the
+// circle is exactly the planet's size all the way, so the jungle seems to become it.
+// The zoom's scale runs on a log scale (an even pull-back looks even), eased in and out, from 1 to the size at which the
+// picture's circle is Earth. The stages are set by scale, not time, so they stay in step if ZOOM_MS changes.
+const ZOOM_PICTURE_H = 3 * 1080; // the picture round the scene, in frame units: 3x3 frames
+const ZOOM_END = EARTH_W / 2 / (ZOOM_PICTURE_H / 2); // the circle cut from its middle (its full height) lands on Earth
+const ROUND_FROM = 0.42; // it starts rounding off at this scale, while the picture still fills the frame...
+const ROUND_TO = 0.2; // ...and is a circle by this one
+const EARTH_IN = [0.3, 0.2] as const; // Earth fades up under it between these scales...
+const JUNGLE_OUT = [0.25, 0.145] as const; // ...then the jungle fades off it
+const EARTH_LINES_MS = 160; // Earth's outlines ink in last, done as the zoom lands
+const STARS_IN_AT = 300; // ms in: the stars fade in round the shrinking picture...
+const STARS_IN_MS = 400;
+const STARS_START_SCALE = 1.5; // ...drifting in from this size, slower than the picture: they're further away
+// The meteor sets off as the zoom lands: Earth has been on screen since the handover. Kept at 1000ms after the zoom
+// starts, so the impact (and everything after it) doesn't move when the zoom is retimed.
+const METEOR_AT = ZOOM_AT + 1000;
 const METEOR_MS = 1100; // enters at the right edge and crosses to the planet
 // Liam's drawing (meteor.svg, Figma 259:563) is 533x240, travelling left: the rock's centre sits at (105, 120) and the
 // flames trail off to the right. Drawn at its native size, as in the storyboard.
@@ -946,7 +956,7 @@ export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & 
   const noise = useRef<HTMLDivElement>(null);
   const slate = useRef<HTMLDivElement>(null);
   const dawnType = useRef<HTMLDivElement>(null);
-  const jungle = useRef<HTMLDivElement>(null);
+  const zoomer = useRef<HTMLDivElement>(null);
   const space = useRef<HTMLDivElement>(null);
   const streaks = useRef<HTMLDivElement>(null);
   const bigLunge = useRef<HTMLDivElement>(null);
@@ -1079,39 +1089,48 @@ export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & 
     scribble(first.current!, FIRST_AT, speed, reduced, anims);
     play(first.current!, [{ opacity: 1 }, { opacity: 0 }], { duration: OUT_MS, delay: FIRST_OUT_AT, easing: "ease-in" }, speed, anims);
 
-    // Speed zoom out through the middle of the frame, one frame then the next. The jungle pulls away into the dark,
-    // gathering speed with a little motion blur, and fades out as it goes; once it's gone, space (stars, Earth) fades in,
-    // still pulling back, and eases to its resting size as the zoom lands.
+    // Speed zoom out through the middle of the frame, the jungle becoming the planet. The camera pulls back from the scene
+    // through its surroundings (zoomer: the scene in a picture three frames by three); before its edges come into view
+    // the picture starts rounding off (its clip goes from the full picture to a circle the picture's height), and keeps
+    // shrinking until the circle is Earth's size. Earth sits under it the whole way at exactly the circle's size, fading
+    // up as the picture fades off it. The stars drift in behind, slower, as they're further away.
     const spotO = `${cq(SPOT_XY[0])} ${cq(SPOT_XY[1])}`;
-    jungle.current!.style.transformOrigin = spotO;
-    space.current!.querySelector<HTMLElement>("[data-space-in]")!.style.transformOrigin = spotO;
-    play(
-      jungle.current!,
-      [
-        { transform: "scale(1)", filter: "blur(0px)", opacity: 1 },
-        { transform: `scale(${1 - (1 - JUNGLE_END_SCALE) * 0.45})`, filter: `blur(${cq(2)})`, opacity: 1, offset: 0.35 },
-        { transform: `scale(${JUNGLE_END_SCALE})`, filter: `blur(${cq(3)})`, opacity: 0 },
-      ],
-      { duration: JUNGLE_OUT_MS, delay: ZOOM_AT, easing: "cubic-bezier(0.55, 0, 0.85, 0.45)", fill: "forwards" },
-      speed,
-      anims,
-    );
-    // The dark behind space is up from the start of the zoom, so the jungle fades out to it.
+    const earthIn = space.current!.querySelector<HTMLElement>("[data-earth-in]")!;
+    const stars = space.current!.querySelector<HTMLElement>("[data-stars]")!;
+    [earthIn, stars].forEach((el) => (el.style.transformOrigin = spotO));
+    zoomer.current!.style.transformOrigin = "50% 50%"; // its middle is the frame's
+    // Sampled, so the picture, its clip, its fade and Earth all follow one curve and can't drift apart. Linear between
+    // samples keeps Earth's scale an exact multiple of the picture's, so it stays the circle's size.
+    const STEPS = 40;
+    const easeInOut = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2);
+    const between = (s: number, [from, to]: readonly [number, number]) => Math.min(1, Math.max(0, (from - s) / (from - to)));
+    const smooth = (k: number) => k * k * (3 - 2 * k);
+    const sideX = (3 * 1920 - ZOOM_PICTURE_H) / 2; // how far in each side the circle sits, in the picture
+    const pictureFrames: Keyframe[] = [], earthFrames: Keyframe[] = [];
+    for (let i = 0; i <= STEPS; i++) {
+      const p = i / STEPS;
+      const s = Math.exp(Math.log(ZOOM_END) * easeInOut(p)); // even on a log scale: each stretch of pull-back looks the same
+      const k = smooth(between(s, [ROUND_FROM, ROUND_TO]));
+      pictureFrames.push({
+        offset: p,
+        transform: `scale(${s})`,
+        clipPath: `inset(0px ${cq(sideX * k)} 0px ${cq(sideX * k)} round ${cq((ZOOM_PICTURE_H / 2) * k)})`,
+        opacity: 1 - smooth(between(s, JUNGLE_OUT)),
+      });
+      earthFrames.push({ offset: p, transform: `scale(${s / ZOOM_END})`, opacity: smooth(between(s, EARTH_IN)) });
+    }
+    const zoomOpts = { duration: ZOOM_MS, delay: ZOOM_AT, easing: "linear", fill: "forwards" as FillMode };
+    play(zoomer.current!, pictureFrames, zoomOpts, speed, anims);
+    play(zoomer.current!.querySelector("[data-paper]")!, [{ opacity: 0 }, { opacity: 0 }],
+      { duration: 1, delay: ZOOM_AT, easing: "steps(1, start)", fill: "forwards" }, speed, anims);
+    play(earthIn, earthFrames, zoomOpts, speed, anims);
+    // The dark behind is up from the start of the zoom, so the shrinking picture pulls away into it.
     play(space.current!, [{ opacity: 1 }, { opacity: 1 }], { duration: 1, delay: ZOOM_AT, easing: "steps(1, start)", fill: "forwards" }, speed, anims);
-    play(
-      space.current!.querySelector("[data-space-in]")!,
-      [
-        { transform: `scale(${SPACE_START_SCALE})`, opacity: 0 },
-        { opacity: 1, offset: 0.45 },
-        { transform: "scale(1)", opacity: 1 },
-      ],
-      { duration: ZOOM_MS - SPACE_IN_AT, delay: ZOOM_AT + SPACE_IN_AT, easing: "cubic-bezier(0.2, 0.7, 0.4, 1)", fill: "forwards" },
-      speed,
-      anims,
-    );
-    // Earth's black outlines ink in just behind its fills, so the planet arrives soft and sharpens as it settles.
+    play(stars, [{ transform: `scale(${STARS_START_SCALE})`, opacity: 0 }, { opacity: 1, offset: STARS_IN_MS / (ZOOM_MS - STARS_IN_AT) }, { transform: "scale(1)", opacity: 1 }],
+      { duration: ZOOM_MS - STARS_IN_AT, delay: ZOOM_AT + STARS_IN_AT, easing: "cubic-bezier(0.3, 0, 0.3, 1)", fill: "forwards" }, speed, anims);
+    // Its black outlines ink in last, so the planet sharpens as it settles.
     play(space.current!.querySelector("[data-earth=lines]")!, [{ opacity: 0 }, { opacity: 1 }],
-      { duration: EARTH_LINES_MS, delay: ZOOM_AT + EARTH_LINES_AT, easing: "ease-out", fill: "forwards" }, speed, anims);
+      { duration: EARTH_LINES_MS, delay: ZOOM_AT + ZOOM_MS - EARTH_LINES_MS, easing: "ease-out", fill: "forwards" }, speed, anims);
     // Speed streaks rush outward from the spot during the zoom.
     streaks.current!.querySelectorAll<HTMLElement>("[data-streak]").forEach((el, i) => {
       play(
@@ -1162,11 +1181,12 @@ export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & 
     <div ref={screen} className="absolute inset-0 overflow-hidden" style={{ background: PAPER }}>
     {/* Everything the impact jolts. */}
     <div className="absolute inset-0">
-    {/* Space: the dark the jungle fades out to, then stars and Earth fading in (data-space-in), then the meteor strike. */}
+    {/* Space: the dark the jungle pulls away into, the stars drifting in behind it, and Earth, which the jungle's circle
+        hands over to (data-earth-in). Then the meteor strike. */}
     <div ref={space} className="absolute inset-0 opacity-0" style={{ background: OFF_BG }}>
-      <div data-space-in className="absolute inset-0 opacity-0">
-        <img src="/patterns/stars.svg" alt="" className="absolute inset-0 size-full" />
-        {/* earth.svg split in two: its fills, and its black outlines, which come in late (EARTH_LINES_AT). */}
+      <img data-stars src="/patterns/stars.svg" alt="" className="absolute inset-0 size-full opacity-0" />
+      <div data-earth-in className="absolute inset-0 opacity-0">
+        {/* earth.svg split in two: its fills, and its black outlines, which ink in last. */}
         {["fill", "lines"].map((part) => (
           <img
             key={part}
@@ -1179,8 +1199,18 @@ export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & 
         ))}
       </div>
     </div>
-    {/* The jungle: everything up to the speed zoom out, which shrinks it into its spot on Earth. */}
-    <div ref={jungle} className="absolute inset-0 overflow-hidden" style={{ background: PAPER }}>
+    {/* The zoom out's picture: the jungle frame in the middle of its surroundings, three frames by three. Only ever seen
+        past the frame's edges in the zoom out (the stage clips it until then); the zoom scales, rounds and fades this. */}
+    <div ref={zoomer} className="absolute" style={{ left: "-100%", top: "-100%", width: "300%", height: "300%" }}>
+      {/* bg-wide.svg (scripts/make-bg-wide.cjs): the scene mirrored out either side, sky above, ground below, and a copy
+          of the scene in the middle under the live frame. */}
+      <img src="/patterns/bg-wide.svg" alt="" className="pointer-events-none absolute inset-0 size-full max-w-none" />
+    {/* The jungle: everything up to the speed zoom out. */}
+    <div className="absolute overflow-hidden"
+      style={{ left: "calc(100% / 3)", top: "calc(100% / 3)", width: "calc(100% / 3)", height: "calc(100% / 3)" }}>
+      {/* The opening's paper, behind the scene until it has faded in. Gone once the zoom starts, so the drawing's soft
+          edge pixels blend into the copy of the scene underneath rather than showing the paper as a hairline. */}
+      <div data-paper className="absolute inset-0" style={{ background: PAPER }} />
       <div ref={scene} className="absolute inset-0 opacity-0">
         {/* Colours in bg.svg are the Figma vector's greys mixed 18% towards white, so it reads fainter without transparency.
             The lava is brand orange #F15D22 with two darker shades of it: #CD4F1D (85%) and #AE4318 (72%). */}
@@ -1273,6 +1303,7 @@ export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & 
       <Scribble line={PUI} ref={pui} style={{ top: cq(MOSAIC_Y - (PUI.h + 8) / 2) }} />
       <Scribble line={BIGGER} ref={bigger} style={{ top: cq(MOSAIC_Y - (BIGGER.h + 8) / 2) }} />
       <Scribble line={MDS} ref={mds} style={{ top: cq(MOSAIC_Y - (MDS.h + 8) / 2) }} />
+    </div>
     </div>
 
     <div ref={streaks} className="absolute inset-0 pointer-events-none">

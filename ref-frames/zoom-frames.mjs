@@ -11,8 +11,8 @@ await p.waitForTimeout(1000);
 await p.evaluate(() => window.__go());
 await p.evaluate(() => document.fonts.ready);
 await p.waitForTimeout(800);
-// The speed streaks are the only 525ms animations (0.7 of the 750ms zoom); the first starts 60ms into it.
-const z = await p.evaluate(() => Math.min(...document.getAnimations().map((a) => a.effect.getTiming()).filter((t) => Math.abs(t.duration - 525) < 0.01).map((t) => t.delay))) - 60;
+// The speed streaks run 0.7 of the zoom (1100ms -> 770ms) and are the only animations that long; the first starts 60ms in.
+const z = await p.evaluate(() => Math.min(...document.getAnimations().map((a) => a.effect.getTiming()).filter((t) => Math.abs(t.duration - 770) < 0.01).map((t) => t.delay))) - 60;
 console.log("ZOOM_AT", z);
 for (const t of times) {
   await p.evaluate((ms) => document.getAnimations().forEach((a) => { a.pause(); a.currentTime = ms; }), z + t);

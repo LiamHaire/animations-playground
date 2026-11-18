@@ -18,7 +18,8 @@ const TAIL_MS = 600;
 mkdirSync("out", { recursive: true });
 
 async function render(theme) {
-  const browser = await chromium.launch({ channel: "chrome" });
+  // Playwright's own Chromium, the one the ref-frames checks use, so the render matches what was checked.
+  const browser = await chromium.launch({ executablePath: process.env.LOCALAPPDATA + "/ms-playwright/chromium-1248/chrome-win64/chrome.exe" });
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   await page.goto(`${base}/#/render/${id}?theme=${theme}`);
   await page.waitForFunction(() => typeof window.__go === "function");

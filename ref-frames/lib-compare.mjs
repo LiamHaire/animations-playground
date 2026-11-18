@@ -27,8 +27,8 @@ for (let i = 0; i < 24; i++) {
   await p.screenshot({ path: `${dir}/gl_${i}.png` });
 }
 // The scribbled lines (opening, a dino line, the dawn line) and the speed zoom out to Earth (750ms, ~7.4s before the glitch).
-// The speed streaks are the only 525ms animations; the first starts 60ms into the zoom.
-const zoomAt = await p.evaluate(() => Math.min(...document.getAnimations().map((a) => a.effect.getTiming()).filter((t) => Math.abs(t.duration - 525) < 0.01).map((t) => t.delay))) - 60;
+// The speed streaks run 0.7 of the zoom (1100ms -> 770ms) and are the only animations that long; the first starts 60ms in.
+const zoomAt = await p.evaluate(() => Math.min(...document.getAnimations().map((a) => a.effect.getTiming()).filter((t) => Math.abs(t.duration - 770) < 0.01).map((t) => t.delay))) - 60;
 for (const t of [800, 1200, 1700, 7000, 7300, g - 3500, g - 3200, zoomAt - 100, zoomAt + 100, zoomAt + 250, zoomAt + 400, zoomAt + 600, zoomAt + 800]) {
   await seek(t);
   await p.waitForTimeout(60);
