@@ -1,0 +1,26 @@
+﻿import { chromium } from "playwright-core";
+const b = await chromium.launch({ executablePath: process.env.LOCALAPPDATA + "/ms-playwright/chromium-1248/chrome-win64/chrome.exe" });
+const p = await b.newPage({ viewport: { width: 1600, height: 1000 } });
+p.on("pageerror", (e) => console.log("ERR", e.message));
+await p.goto("http://localhost:3002/#/animations/hero-intro");
+await p.waitForTimeout(800);
+const stage = p.locator("[data-stage]");
+// Replay mid-run twice, then 2x: the phrase faces must not double up.
+await p.waitForTimeout(3000);
+await p.getByRole("button", { name: "Replay" }).click();
+await p.waitForTimeout(1500);
+await p.getByRole("button", { name: "Replay" }).click();
+await p.getByRole("button", { name: "2x" }).click();
+await p.waitForTimeout(3600);
+console.log("faces:", await p.locator(".hero-intro .phrase").count(), "chars:", await p.locator(".hero-intro .ch").count());
+await stage.screenshot({ path: "ref-frames/chk_2x.png" });
+await p.getByRole("button", { name: "1x" }).click();
+await p.getByRole("button", { name: "Reduced motion" }).click();
+await p.waitForTimeout(300);
+await stage.screenshot({ path: "ref-frames/chk_reduced.png" });
+await p.goto("http://localhost:3002/#/animations/notch");
+await p.waitForTimeout(500);
+await p.getByRole("button", { name: "1:1" }).click();
+await p.waitForTimeout(1900);
+await stage.screenshot({ path: "ref-frames/chk_notch_square.png" });
+await b.close();

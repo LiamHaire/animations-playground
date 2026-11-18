@@ -1,0 +1,290 @@
+/* The portfolio's intro (~/portfolio/public/intro/hero-animation.html), its tokens from ~/portfolio/public/tokens.css. Scoped
+   to .hero-intro, which stands in for the page's <html>: the classes and custom properties the script set on the root are
+   set on it instead. It always plays dark, as the portfolio's intro gate does. Durations divide by --speed (set from the
+   toolbar's speed), so the CSS transitions keep pace with the script's timers. */
+@font-face {
+  font-family: "Roboto Mono";
+  src: url("/fonts/RobotoMono-400-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-display: block;
+}
+
+.hero-intro {
+  --color-ink-50: oklch(0.985 0.003 290);
+  --color-ink-100: oklch(0.96 0.005 290);
+  --color-ink-400: oklch(0.71 0.015 288);
+  --color-ink-500: oklch(0.56 0.02 287);
+  --color-ink-600: oklch(0.44 0.022 286);
+  --color-ink-700: oklch(0.34 0.025 285);
+  --color-ink-900: oklch(0.18 0.025 283);
+  --color-ink-950: oklch(0.13 0.022 282);
+  --bg: var(--color-ink-950);
+  --text: var(--color-ink-100);
+  --muted: var(--color-ink-400);
+  --accent: oklch(0.67 0.25 355); /* hot-500 */
+  --accent-purple: #9467cc;
+  --accent-purple-secondary: #e9e1f5;
+  --speed: 1;
+
+  /* ---- Colours (sampled from the reference frames) ---- */
+  --paper: var(--color-ink-50);           /* stage 2 background */
+  --stage-bg: var(--bg);                  /* page background token */
+  --stage-text: var(--text);              /* page text token, as "Hi, I’m Liam" */
+  --cursor: color-mix(in srgb, var(--text) 60%, transparent);  /* caret on the page background */
+  --im-color: var(--color-ink-500);       /* "I’m" */
+  --name-color: var(--color-ink-900);      /* "Liam Haire" */
+  --name-cursor: color-mix(in srgb, var(--color-ink-900) 60%, transparent);   /* caret on the light stage */
+
+  --lift: 6%;                /* raises the whole intro above dead centre (percentage of the frame height) */
+  --scale: 0.6;            /* overall size of the intro: 1 = full 16:9 frame, lower = smaller on screen */
+
+  /* ---- Type & geometry (measured at 1920 × 1080, scaled with cqw) ---- */
+  --font-size: 7.083cqw;      /* 136px at 1920 */
+  --hello-weight: 500;
+  --im-weight: 300;
+  --name-weight: 700;
+  --cursor-w: 0.417cqw;       /* 8px */
+  --cursor-h: 6.146cqw;       /* 118px */
+  --cursor-gap: 0.573cqw;     /* 11px */
+  --text-nudge: 0cqw;         /* nudge text vertically against the caret if needed */
+  --dot-size: var(--cursor-w);   /* full stop = same width as the caret, so the letters never shift as it morphs */
+  --dot-gap: var(--cursor-gap);  /* and the same gap from the o */
+  --dot-hello-size: 0.625cqw;    /* "Hello." full stop: a bit larger than the caret (12px at 1920); its layout footprint stays the caret's, so the text never moves */
+
+  /* Where "I’m" lands: up and smaller, as in the third reference frame */
+  --im-shift: -6.75cqw;       /* about 130px up at 1920 */
+  --im-scale: 0.78;
+
+  /* Subtitle line under the name */
+  --sub-size: 3.333cqw;       /* 64px at 1920 */
+  --sub-weight: 300;
+  --sub-color: var(--color-ink-600);      /* between the name and "I’m" */
+  --sub-shift: 7.03cqw;       /* about 135px below the name's centre line at 1920 */
+
+  /* Phrase slides (design systems, AI-driven design, ...) */
+  --phrase-weight: 700;
+  --label-size: 3.5cqw;       /* index numbers: about 67px at 1920 */
+  --label-x: 18.85cqw;        /* left edge of the numbers (362px at 1920) */
+  --label-y: -7.03cqw;        /* centre line of the numbers, above the phrase */
+  --persp: 75cqw;             /* camera distance for the rolling drum */
+
+  /* Colour inversion: slow, symmetrical ease so the flip feels like a wash, not a cut */
+  --invert-ms: 350ms;
+  --ease-inout: cubic-bezier(.65, 0, .35, 1);
+
+  /* The stage's size, so the 16:9 frame can fit inside it in any aspect. */
+  container-type: size;
+  background: var(--stage-bg);
+  transition: background-color calc(var(--invert-ms) / var(--speed)) var(--ease-inout);
+}
+
+/* Colours invert for the second half */
+.hero-intro.inverted {
+  --stage-bg: var(--paper);
+}
+
+.hero-intro * { box-sizing: border-box; margin: 0; }
+
+/* Used when replaying so everything snaps back instantly */
+.hero-intro.snap, .hero-intro.snap * { transition: none !important; animation: none !important; }
+
+.hero-intro .stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--stage-bg);
+  overflow: hidden;
+  transition: background-color calc(var(--invert-ms) / var(--speed)) var(--ease-inout);
+}
+
+/* Keeps a true 16:9 composition inside any stage */
+.hero-intro .frame {
+  position: relative;
+  width: calc(min(100cqw, 100cqh * 16 / 9) * var(--scale));
+  aspect-ratio: 16 / 9;
+  translate: 0 calc(var(--lift) * -1);
+  display: grid;
+  place-items: center;
+  container-type: inline-size;
+}
+.hero-intro .frame > .stack, .hero-intro .frame > .phrase-wrap { grid-area: 1 / 1; }
+
+/* Hello, I’m and the name all share the same centre point */
+.hero-intro .stack {
+  display: grid;
+  place-items: center;
+  font-family: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+  font-size: var(--font-size);
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.hero-intro .stack > * { grid-area: 1 / 1; }
+
+/* Mask: text slides up through this clipped box (the Apple-style line reveal) */
+.hero-intro .mask {
+  display: flex;
+  justify-content: center;
+  clip-path: inset(-0.05em -1em);
+}
+.hero-intro .im .mask { display: block; }
+.hero-intro .im-text  { display: block; }
+
+.hero-intro .line {
+  display: inline-flex;
+  align-items: center;
+}
+
+.hero-intro .hello { color: var(--stage-text); font-weight: var(--hello-weight); }
+.hero-intro .hello.gone { visibility: hidden; }
+
+.hero-intro .name  { color: var(--name-color); font-weight: var(--name-weight); }
+
+.hero-intro .text {
+  white-space: pre;
+  transform: translateY(var(--text-nudge));
+}
+
+.hero-intro .cursor {
+  width: var(--cursor-w);
+  height: var(--cursor-h);
+  border-radius: 999px;
+  background: var(--cursor);
+  margin-left: var(--cursor-gap);
+  opacity: 0;
+  transition: opacity 0s;
+}
+.hero-intro .name .cursor { background: var(--name-cursor); }
+
+/* Lone caret sits dead centre, as in the first frames */
+.hero-intro .line:not(.has-text) .cursor { margin-left: 0; }
+
+.hero-intro .cursor.on   { opacity: 1; }
+.hero-intro .cursor.fade { transition: opacity calc(240ms / var(--speed)) cubic-bezier(.4, 0, .2, 1); opacity: 0; }
+
+/* Zero-size marker that sits on the text baseline: tells the caret where to land as the full stop */
+.hero-intro .probe { display: inline-block; width: 0; height: 0; }
+
+/* "I’m" */
+.hero-intro .im {
+  display: none;
+  color: var(--im-color);
+  font-weight: var(--im-weight);
+  transform-origin: 50% 50%;
+}
+.hero-intro .im.show { display: block; }
+
+/* Final resting state of "I’m". The movement into it is animated in the script. */
+.hero-intro .im.lift {
+  translate: 0 var(--im-shift);
+  scale: var(--im-scale);
+}
+
+/* Subtitle: two lines stacked in one spot, each with its own mask for the swipe-up reveal */
+.hero-intro .sub {
+  display: grid;
+  justify-items: center;
+  font-size: var(--sub-size);
+  font-weight: var(--sub-weight);
+  color: var(--sub-color);
+  translate: 0 var(--sub-shift);
+}
+.hero-intro .sub > .mask {
+  grid-area: 1 / 1;
+  display: block;
+  clip-path: inset(-0.05em -1em -0.3em -1em);   /* extra room at the bottom for descenders */
+}
+.hero-intro .sub-line { display: block; white-space: nowrap; line-height: 1; }
+.hero-intro .sub .w   { display: inline-block; translate: 0 150%; }   /* hidden below the mask until revealed */
+.hero-intro .sub-b            { visibility: hidden; }
+.hero-intro .sub-b.live       { visibility: inherit; }
+
+/* ---- Phrase slides: each phrase is a face on a drum that rolls around an axis just behind the text ---- */
+.hero-intro .phrase-wrap {
+  display: grid;
+  place-items: center;
+  perspective: var(--persp);
+}
+.hero-intro .phrase {
+  grid-area: 1 / 1;
+  --drum-r: 0.55em;
+  font-family: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+  font-weight: var(--phrase-weight);
+  font-size: var(--font-size);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transform-origin: 50% 50% calc(var(--drum-r) * -1);
+  backface-visibility: hidden;
+  visibility: hidden;
+  will-change: transform;
+}
+.hero-intro .label-wrap {
+  position: absolute;
+  left: var(--label-x);
+  top: calc(50% + var(--label-y));
+  translate: 0 -50%;
+  display: grid;
+  justify-items: start;
+  perspective: var(--persp);
+}
+.hero-intro .no {
+  grid-area: 1 / 1;
+  --drum-r: 0.55em;
+  font-family: "Roboto Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-weight: 400;
+  font-size: var(--label-size);
+  line-height: 1;
+  transform-origin: 50% 50% calc(var(--drum-r) * -1);
+  backface-visibility: hidden;
+  visibility: hidden;
+  will-change: transform;
+}
+/* ---- Closing: "and this / is my portfolio" ---- */
+.hero-intro .frame > .closing { grid-area: 1 / 1; }
+.hero-intro .closing {
+  display: grid;
+  place-items: center;
+  font-family: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+  font-size: var(--font-size);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  visibility: hidden;
+}
+.hero-intro .closing > * { grid-area: 1 / 1; }
+.hero-intro .and {
+  font-size: calc(1em * var(--im-scale));
+  font-weight: var(--im-weight);
+  color: var(--im-color);
+  translate: 0 var(--im-shift);
+  transition: color calc(var(--invert-ms) / var(--speed)) var(--ease-inout);
+}
+.hero-intro .closing.dark .and { color: var(--muted); }
+.hero-intro .and .mask { display: block; }
+.hero-intro .and-text  { display: block; }
+.hero-intro .is-line {
+  display: flex;
+  align-items: baseline;
+  height: 1em;
+  font-weight: var(--name-weight);
+  color: var(--stage-text);
+  white-space: pre;
+}
+.hero-intro .ch { display: inline-block; white-space: pre; opacity: 0; }
+/* Same full stop as "Hello.": caret width, caret gap, pink. Holds its space from the start so the line never shifts. */
+.hero-intro .stop {
+  display: inline-block;
+  width: var(--dot-hello-size);
+  height: var(--dot-hello-size);
+  margin-left: calc(var(--dot-gap) - (var(--dot-hello-size) - var(--dot-size)) / 2);   /* growth split either side, so the footprint matches the old dot */
+  margin-right: calc((var(--dot-size) - var(--dot-hello-size)) / 2);
+  border-radius: 999px;
+  background: var(--accent);
+  transform-origin: 50% 100%;
+  opacity: 0;
+}
+
+.hero-intro .sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}

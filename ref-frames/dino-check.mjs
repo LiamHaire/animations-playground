@@ -1,0 +1,10 @@
+﻿import { chromium } from "playwright-core";
+const exe = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1248/chrome-win64/chrome.exe";
+const b = await chromium.launch({ executablePath: exe });
+const p = await b.newPage({ viewport: { width: 1560, height: 1000 } });
+await p.goto("http://localhost:3002/");
+const poses = ["neutral", "fwd", "back", "open", "shut", "lookup"];
+await p.setContent(`<body style="margin:0;background:#c0392b;display:grid;grid-template-columns:repeat(3,520px);gap:0">${poses.map((n) => `<div style="height:500px;display:flex;align-items:center;justify-content:center;font:14px sans-serif;color:#fff;flex-direction:column"><img src="http://localhost:3002/patterns/big-${n}.svg?v=${Date.now()}"/>${n}</div>`).join("")}</body>`);
+await p.waitForTimeout(800);
+await p.screenshot({ path: "ref-frames/dino-check.png" });
+await b.close();

@@ -1,0 +1,172 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/montserrat";
+@import "@fontsource/amatic-sc";
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/Satoshi-Variable.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+/* Figma variables (node 127:197) as semantic CSS variables. Dark is the default stage; .stage-light switches to light. */
+:root {
+  --accent: #404040;
+  --accent-foreground: #fafafa;
+  --background: #0a0a0a;
+  --border: #ffffff1a;
+  --card: #171717;
+  --card-foreground: #fafafa;
+  --destructive: #f87171;
+  --destructive-foreground: #fef2f2;
+  --foreground: #fafafa;
+  --input: #ffffff26;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --popover: #262626;
+  --popover-foreground: #fafafa;
+  --primary: #e5e5e5;
+  --primary-foreground: #171717;
+  --ring: #737373;
+  --secondary: #262626;
+  --secondary-foreground: #fafafa;
+  --chart-1: #ea580c;
+  --chart-2: #0d9488;
+  --chart-3: #0284c7;
+  --chart-4: #ca8a04;
+  --chart-5: #a855f7;
+  --sidebar: #171717;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #1d4ed8;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #404040;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #ffffff1a;
+  --sidebar-ring: #525252;
+
+  /* Figma: tailwind colors/yellow/500 and colors/orange/600, plus the 15% orange icon fill */
+  --connectors-yellow: #eab308;
+  --connectors-orange: #ea580c;
+  --connectors-orange-pressed: #c2410c; /* orange/700, one step darker than the PLACE box */
+  --connectors-logo-yellow: #ffca29; /* mean of the yellow pixels in the IQ crest artwork */
+  --connectors-gradient: linear-gradient(171deg, var(--connectors-yellow) 35%, var(--connectors-orange) 60%);
+  --connectors-icon-fill: rgb(234 88 12 / 0.15);
+  /* Tile colours from the "all your" frame. They are raw hex in Figma (no variables), so they don't change with the theme. */
+  --tile-mail: #c11f70;
+  --tile-mail-fg: #fbe9f2;
+  --tile-tasks: #0f5e63;
+  --tile-tasks-fg: #e3f2f3;
+  --tile-data: #6b3fa0;
+  --tile-data-fg: #f0eaf7;
+  --tile-events: #c2560f;
+  --tile-events-fg: #fff8f3;
+}
+
+/* Declared on both selectors so var() re-resolves against .stage-light's overrides instead of inheriting :root's resolved values. */
+:root, .stage-light {
+  --stage-bg: var(--background);
+  --stage-fg: var(--foreground);
+  --stage-muted: var(--muted-foreground);
+}
+
+.stage-light {
+  /* The Figma frames sit on base/sidebar-primary-foreground (#fafafa), not base/background (#ffffff). */
+  --stage-bg: var(--sidebar-primary-foreground);
+  --accent: #f5f5f5;
+  --accent-foreground: #171717;
+  --background: #ffffff;
+  --border: #e5e5e5;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --destructive: #dc2626;
+  --destructive-foreground: #fef2f2;
+  --foreground: #0a0a0a;
+  --input: #e5e5e5;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #171717;
+  --primary-foreground: #fafafa;
+  --ring: #a3a3a3;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #171717;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #e5e5e5;
+  --sidebar-accent-foreground: #171717;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #a3a3a3;
+}
+
+@theme inline {
+  --font-display: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-geist: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-montserrat: "Montserrat Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand: #7c5cff;
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-background: var(--background);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-foreground: var(--foreground);
+  --color-input: var(--input);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* The AI chat clip's portfolio tokens (set on .ai-chat in animations/ai-chat/ai-chat.css). */
+  --font-ai-body: "General Sans", "Helvetica Neue", Arial, sans-serif;
+  --ease-ai-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --color-ai-text: var(--text);
+  --color-ai-subtle: var(--subtle);
+  --color-ai-muted: var(--muted);
+  --color-ai-chat: var(--surface-chat);
+  --color-ai-chat-prompt: var(--surface-chat-prompt);
+  --color-ai-border-chat: var(--border-chat);
+  --color-ai-border-chat-prompt: var(--border-chat-prompt);
+  --color-ai-surface-strong: var(--surface-strong);
+  --color-ai-purple: var(--accent-purple);
+
+  /* The Notch clip's portfolio tokens (set on .notch-laptop in animations/notch/notch.css). */
+  --font-notch-body: "General Sans", "Helvetica Neue", Arial, sans-serif;
+  --color-notch-bg: var(--bg);
+  --color-notch-text: var(--text);
+  --color-notch-subtle: var(--subtle);
+  --color-notch-chat: var(--surface-chat);
+  --color-notch-chat-prompt: var(--surface-chat-prompt);
+  --color-notch-border-chat: var(--border-chat);
+  --color-notch-border-strong: var(--border-strong);
+}
+
+body { background: #16161c; color: #e8e8ee; font-family: var(--font-display); }
+
+@keyframes caret { 50% { opacity: 0; } }

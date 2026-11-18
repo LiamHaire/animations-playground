@@ -1,0 +1,20 @@
+﻿import { chromium } from "playwright-core";
+const exe = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1248/chrome-win64/chrome.exe";
+const b = await chromium.launch({ executablePath: exe });
+const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });
+p.on("pageerror", (e) => console.log("ERR", e.message));
+await p.goto("http://localhost:3002/#/render/patterns");
+await p.waitForTimeout(1000);
+await p.evaluate(() => window.__go());
+await p.waitForTimeout(800);
+const r = await p.evaluate(() => {
+  const end = Math.max(...document.getAnimations().map((a) => { const t = a.effect.getComputedTiming(); return t.endTime; }));
+  const first = (sel) => { const a = document.querySelector(sel)?.getAnimations()[0]; return a ? Math.round(a.effect.getTiming().delay) : null; };
+  const lines = Object.fromEntries([...document.querySelectorAll("svg[aria-label]")].map((s) => [s.getAttribute("aria-label"), Math.round(s.querySelector("[data-g]").getAnimations()[0].effect.getTiming().delay)]));
+  const look = [...document.querySelectorAll('img[src*="big-lookup"]')][0].getAnimations()[0];
+  const ks = look.effect.getKeyframes(), tm = look.effect.getTiming();
+  const lookAt = Math.round(tm.delay + ks.find((k) => k.opacity == 1).computedOffset * tm.duration);
+  return { end: Math.round(end), bigLookup: lookAt, lines };
+});
+console.log(JSON.stringify(r));
+await b.close();

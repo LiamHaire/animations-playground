@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+
+# Renders and scratch output
+out/
+exports/
+_backup/
+
+# Review frames: keep the scripts, not the screenshots they write
+ref-frames/*
+!ref-frames/*.mjs
