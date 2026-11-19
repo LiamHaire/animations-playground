@@ -1,0 +1,10 @@
+import { chromium } from "playwright-core";
+const exe = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1248/chrome-win64/chrome.exe";
+const b = await chromium.launch({ executablePath: exe });
+const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });
+await p.goto("http://localhost:3002/");
+const html = Array.from({ length: 23 }, (_, i) => { const n = String(i + 1).padStart(2, "0"); return `<div style="position:relative;width:380px;height:213px;background:#0a0a0a"><img src="/explosion/e${n}.svg" style="width:100%;height:100%"><span style="position:absolute;left:4px;top:2px;color:#fff;font:12px monospace">${n}</span></div>`; }).join("");
+await p.route("**/*", (r) => r.continue()); await p.setContent(`<body style="margin:0;background:#222;display:flex;flex-wrap:wrap;gap:4px;width:1920px">${html}</body>`);
+await p.waitForTimeout(500);
+await p.screenshot({ path: "ref-frames/explosion-sheet.png" });
+await b.close();

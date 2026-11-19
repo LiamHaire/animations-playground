@@ -2,10 +2,11 @@ import type { ComponentType } from "react";
 import type { ClipProps } from "../play";
 import { Connectors } from "./connectors/Connectors";
 import { Patterns, PatternsAct1, PatternsTitle } from "./patterns/Patterns";
-import { MeteorImpact } from "./meteor-impact/MeteorImpact";
+import { Explosion } from "./explosion/Explosion";
 import { AiChat } from "./ai-chat/AiChat";
 import { Notch } from "./notch/Notch";
 import { HeroIntro } from "./hero-intro/HeroIntro";
+import { ZoomThrough } from "../clips/ZoomThrough";
 
 export type Animation = {
   id: string; // used in the URL: #/animations/<id>
@@ -41,10 +42,16 @@ export const ANIMATIONS: Animation[] = [
     Comp: PatternsTitle,
   },
   {
-    id: "meteor-impact",
-    name: "Meteor impact",
-    description: "Standalone study of the meteor strike, to tune before it goes into Patterns.",
-    Comp: MeteorImpact,
+    id: "zoom-to-planet",
+    name: "Zoom to planet",
+    description: "Study for the Patterns zoom out, from the Playground's Zoom through clip: the wide frame shrinks and rounds into a circle that becomes the planet.",
+    Comp: ZoomThrough,
+  },
+  {
+    id: "explosion",
+    name: "Explosion",
+    description: "Hand-drawn explosion from 23 SVG frames: flash, fireball, then smoke breaking up. About 1.1s.",
+    Comp: Explosion,
   },
   {
     id: "ai-chat",

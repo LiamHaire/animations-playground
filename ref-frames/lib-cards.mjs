@@ -1,4 +1,4 @@
-// Contact sheet of the new library cards on the Playground, seeked to a few times each. node ref-frames/lib-cards.mjs [light]
+﻿// Contact sheet of the new library cards on the Playground, seeked to a few times each. node ref-frames/lib-cards.mjs [light]
 import { chromium } from "playwright-core";
 const exe = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1248/chrome-win64/chrome.exe";
 const b = await chromium.launch({ executablePath: exe });
@@ -18,7 +18,7 @@ const CARDS = {
   "Scribble": [300, 700, 1100, 1700],
   "Stretch into shapes": [1300, 1550, 1700, 2000, 2200, 2500, 2900],
   "Roll up / roll down": [400, 850, 1250, 1600],
-  "Zoom through": [800, 1050, 1200, 1350, 1700],
+  "Zoom through": [700, 1300, 1550, 1700, 2200],
 };
 for (const [name, times] of Object.entries(CARDS)) {
   const card = p.locator("section").filter({ has: p.getByRole("heading", { name, exact: false }) }).locator("[data-stage]").first();

@@ -1,93 +1,142 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { type ClipProps, cq, play } from "../play";
 
-// Speed zoom out (from the Patterns film, the jungle into its spot on Earth): the outgoing frame shrinks into one spot
-// on an accelerating curve with a little motion blur, while the incoming frame shrinks from huge down to its resting
-// size around the same spot, so the two read as one camera move. Speed streaks rush outward from the spot.
-export const ZOOM_MS = 750;
-const ZOOM_EASE = "cubic-bezier(0.7, 0, 0.3, 1)";
+// Zoom out to a planet (worked out for the Patterns film, jungle to Earth). It opens on a long, wide frame (letterboxed
+// to frameAspect), which pulls back into space: the rectangle shrinks and rounds off into a circle, and that circle is
+// the planet. Inside it, the frame's content keeps
+// zooming out faster than the circle shrinks, so more of it comes into view, while the planet's own design fades in over
+// it. Stars fade in behind and speed streaks rush out from the middle.
+//
+// The window (the frame's outline) and the content are two separate moves on one eased curve, sampled into keyframes so
+// they can't drift apart: the window shrinks to the planet, the content much further.
+export const ZOOM_MS = 1200;
 
 type ZoomThroughProps = ClipProps & {
-  from?: ReactNode;
-  to?: ReactNode;
+  from?: ReactNode; // the frame's content, centred; it can be bigger than the frame (a panorama) to reveal as it pulls back
+  planet?: ReactNode; // the planet's design, filling a planetSize box; any [data-planet-lines] inside inks in last
+  space?: ReactNode; // behind everything; fades in round the shrinking frame
   at?: number;
   duration?: number;
-  // Where the zoom goes through, as fractions of the frame's width and height. The film uses [0.573, 0.49], the meteor's
-  // landing spot on Earth, right of centre.
-  spot?: readonly [number, number];
-  endScale?: number; // the outgoing frame at the end: a speck
-  startScale?: number; // the incoming frame at the start: too big to make out
-  inMs?: number; // the incoming frame fades up over the first part of the zoom, under the shrinking one
+  planetSize?: number; // diameter, px in a 1920-wide frame
+  frameAspect?: number; // the starting frame's width to height: wider than the stage letterboxes it (2.39 is cinema scope)
+  contentEnd?: number; // the content's scale at the end; by default a 3-frame-tall panorama's height fills the planet
+  round?: readonly [number, number]; // progress (0 to 1) over which the rectangle rounds off into a circle
+  planetIn?: readonly [number, number]; // ...the planet's design fades in (the content fades out after it)
+  linesIn?: readonly [number, number]; // ...the planet's outlines ink in
+  starsIn?: readonly [number, number]; // ...the stars fade in
   streaks?: number; // 0 for none
   streakColor?: string;
 };
 
+const range = (p: number, [a, b]: readonly [number, number]) => Math.min(1, Math.max(0, (p - a) / (b - a)));
+const smooth = (k: number) => k * k * (3 - 2 * k);
+const easeInOut = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2);
+
 export function ZoomThrough({
-  runKey, speed, reduced, from, to, at = 900, duration = ZOOM_MS, spot = [0.5, 0.5], endScale = 0.006, startScale = 14,
-  inMs = 360, streaks = 16, streakColor = "#fff",
+  runKey, speed, reduced, from, planet, space, at = 800, duration = ZOOM_MS, planetSize = 382, frameAspect = 2.39, contentEnd,
+  round = [0.3, 0.7], planetIn = [0.55, 0.85], linesIn = [0.85, 1], starsIn = [0.15, 0.6], streaks = 16, streakColor = "#fff",
 }: ZoomThroughProps) {
-  const out = useRef<HTMLDivElement>(null);
-  const into = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const stars = useRef<HTMLDivElement>(null);
+  const win = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const globe = useRef<HTMLDivElement>(null);
   const lines = useRef<HTMLDivElement>(null);
-  const origin = `${spot[0] * 100}% ${spot[1] * 100}%`;
 
   useEffect(() => {
     const anims: Animation[] = [];
-    const opts = { duration, delay: at, easing: ZOOM_EASE, fill: "forwards" as FillMode };
+    const opts = { duration, delay: at, easing: "linear", fill: "forwards" as FillMode };
+    const planetLines = globe.current!.querySelector("[data-planet-lines]");
     if (reduced) {
-      play(out.current!, [{ opacity: 1 }, { opacity: 0 }], { ...opts, duration: 300, easing: "ease" }, speed, anims);
-      play(into.current!, [{ opacity: 0 }, { opacity: 1 }], { ...opts, duration: 300, easing: "ease", fill: "both" }, speed, anims);
+      const fade = { ...opts, duration: 400, easing: "ease" };
+      play(content.current!, [{ opacity: 1 }, { opacity: 0 }], fade, speed, anims);
+      play(globe.current!, [{ opacity: 0 }, { opacity: 1 }], { ...fade, fill: "both" }, speed, anims);
+      play(stars.current!, [{ opacity: 0 }, { opacity: 1 }], { ...fade, fill: "both" }, speed, anims);
+      if (planetLines) play(planetLines, [{ opacity: 1 }, { opacity: 1 }], { ...fade, fill: "both" }, speed, anims);
+      play(win.current!, [{ clipPath: "none" }, { clipPath: "none" }], fade, speed, anims);
       return () => anims.forEach((a) => a.cancel());
     }
-    play(out.current!, [
-      { transform: "scale(1)", filter: "blur(0px)", opacity: 1 },
-      { transform: "scale(0.35)", filter: `blur(${cq(3)})`, opacity: 1, offset: 0.35 },
-      { transform: `scale(${endScale})`, filter: `blur(${cq(1)})`, opacity: 0 },
-    ], opts, speed, anims);
-    play(into.current!, [
-      { transform: `scale(${startScale})`, opacity: 0 },
-      { transform: `scale(${startScale * 0.4})`, opacity: 1, offset: inMs / duration },
-      { transform: "scale(1)", opacity: 1 },
-    ], { ...opts, fill: "both" }, speed, anims);
+    // The starting frame: the stage's width, letterboxed to frameAspect (or the stage's own height, if that's wider).
+    const SW = root.current!.clientWidth, SH = root.current!.clientHeight;
+    const W = SW, H = Math.min(SH, SW / frameAspect);
+    const R = (planetSize / 2) * (SW / 1920) * 1.005; // the window lands on the planet's edge (a hair outside, for its outline)
+    const sEnd = R / (H / 2); // the window's shrink: its height lands on the planet's diameter
+    const cy = SH / 2; // the frame is centred in the stage
+    // By default the content ends with a 3-frame-tall panorama's height filling the planet, so its edges never show in it.
+    const cEnd = contentEnd ?? planetSize / (3 * 1080);
+    const STEPS = 48;
+    const winFrames: Keyframe[] = [], contentFrames: Keyframe[] = [], globeFrames: Keyframe[] = [];
+    for (let i = 0; i <= STEPS; i++) {
+      const p = i / STEPS, e = easeInOut(p);
+      // Both on a log scale, so each stretch of the pull-back looks the same.
+      const s = Math.exp(Math.log(sEnd) * e), c = Math.exp(Math.log(cEnd) * e);
+      const m = smooth(range(p, round)); // 0 a rectangle, 1 a circle
+      const hh = (H / 2) * s;
+      const hw = (W / 2) * s * (1 - m) + hh * m; // the frame's width comes in to match its height as it rounds
+      winFrames.push({ offset: p, clipPath: `inset(${cy - hh}px ${SW / 2 - hw}px ${SH - cy - hh}px ${SW / 2 - hw}px round ${hh * m}px)` });
+      // The content gives way as the planet comes in, a little behind it, so the two cross-fade rather than stack.
+      const handover = [(planetIn[0] + planetIn[1]) / 2, Math.min(1, planetIn[1] + 0.05)] as const;
+      contentFrames.push({ offset: p, transform: `scale(${c})`, opacity: 1 - smooth(range(p, handover)) });
+      globeFrames.push({ offset: p, transform: `scale(${hh / R})`, opacity: smooth(range(p, planetIn)) });
+    }
+    // Letterboxed from the start, held there until the zoom.
+    play(win.current!, winFrames, { ...opts, fill: "both" }, speed, anims);
+    play(content.current!, contentFrames, opts, speed, anims);
+    play(globe.current!, globeFrames, opts, speed, anims);
+    if (planetLines) {
+      play(planetLines, [{ opacity: 0 }, { opacity: 0, offset: linesIn[0] }, { opacity: 1, offset: linesIn[1] }, { opacity: 1 }], { ...opts, easing: "ease-out" }, speed, anims);
+    }
+    // The stars drift in from a little bigger, slower than the frame: they're further away.
+    play(stars.current!, [
+      { opacity: 0, transform: "scale(1.4)", offset: 0 },
+      { opacity: 0, offset: starsIn[0] },
+      { opacity: 1, offset: starsIn[1] },
+      { opacity: 1, transform: "scale(1)", offset: 1 },
+    ], { ...opts, easing: "cubic-bezier(0.3, 0, 0.3, 1)" }, speed, anims);
     lines.current!.querySelectorAll<HTMLElement>("[data-streak]").forEach((el, i) => {
       play(el, [
         { opacity: 0, transform: `rotate(${el.dataset.a}deg) translateX(${cq(30)}) scaleX(0.2)` },
         { opacity: 0.9, transform: `rotate(${el.dataset.a}deg) translateX(${cq(300)}) scaleX(1)`, offset: 0.4 },
         { opacity: 0, transform: `rotate(${el.dataset.a}deg) translateX(${cq(1300)}) scaleX(1.6)` },
-      ], { duration: duration * 0.7, delay: at + 60 + (i % 5) * 40, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" }, speed, anims);
+      ], { duration: duration * 0.6, delay: at + duration * 0.2 + (i % 5) * 40, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" }, speed, anims);
     });
     return () => anims.forEach((a) => a.cancel());
-  }, [runKey, speed, reduced, at, duration, endScale, startScale, inMs, streaks]);
+  }, [runKey, speed, reduced, at, duration, planetSize, frameAspect, contentEnd, round[0], round[1], planetIn[0], planetIn[1], linesIn[0], linesIn[1], starsIn[0], starsIn[1], streaks]);
 
   return (
-    <div className="absolute inset-0 overflow-hidden">
-      <div ref={into} className="absolute inset-0" style={{ transformOrigin: origin }}>{to ?? <DemoSpace spot={spot} />}</div>
-      <div ref={out} className="absolute inset-0" style={{ transformOrigin: origin }}>{from ?? <DemoScene />}</div>
+    <div ref={root} className="absolute inset-0 overflow-hidden" style={{ background: "#0a0a0a" }}>
+      <div ref={stars} className="absolute inset-0 opacity-0">{space ?? <DemoStars />}</div>
+      {/* The window: the frame's outline, clipped from the full frame down to the planet. */}
+      <div ref={win} className="absolute inset-0">
+        <div ref={content} className="absolute inset-0">{from ?? <DemoPanorama />}</div>
+        <div ref={globe} className="absolute opacity-0"
+          style={{ left: "50%", top: "50%", width: cq(planetSize), height: cq(planetSize), translate: "-50% -50%" }}>
+          {planet ?? <DemoPlanet />}
+        </div>
+      </div>
       <div ref={lines} className="pointer-events-none absolute inset-0" aria-hidden>
         {Array.from({ length: streaks }, (_, i) => (
           <div key={i} data-streak data-a={(i * 360) / streaks + (i % 3) * 7} className="absolute opacity-0"
-            style={{ left: `${spot[0] * 100}%`, top: `${spot[1] * 100}%`, width: cq(160 + (i % 4) * 60), height: cq(3), transformOrigin: "0 50%", borderRadius: cq(2), background: streakColor }} />
+            style={{ left: "50%", top: "50%", width: cq(160 + (i % 4) * 60), height: cq(3), transformOrigin: "0 50%", borderRadius: cq(2), background: streakColor }} />
         ))}
       </div>
     </div>
   );
 }
 
-function DemoScene() {
+// The demo uses the Patterns film's own pieces, so it can be judged for the film as it is.
+// The jungle in its surroundings: bg-wide.svg is three frames by three, the scene in the middle.
+function DemoPanorama() {
+  return <img src="/patterns/bg-wide.svg" alt="" className="absolute max-w-none" style={{ left: "50%", top: "50%", width: "300%", translate: "-50% -50%" }} />;
+}
+function DemoPlanet() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ background: "#fafafa" }}>
-      <p className="font-geist font-medium" style={{ fontSize: cq(120), color: "#0a0a0a" }}>Zoom out</p>
-    </div>
+    <>
+      <img src="/patterns/earth-fill.svg" alt="" className="absolute inset-0 size-full" />
+      <img data-planet-lines src="/patterns/earth-lines.svg" alt="" className="absolute inset-0 size-full opacity-0" />
+    </>
   );
 }
-function DemoSpace({ spot }: { spot: readonly [number, number] }) {
-  return (
-    <div className="absolute inset-0" style={{ background: "#0a0a0a" }}>
-      {Array.from({ length: 40 }, (_, i) => (
-        <div key={i} className="absolute rounded-full bg-white" style={{ left: `${(i * 37) % 100}%`, top: `${(i * 61) % 100}%`, width: cq(3 + (i % 3)), height: cq(3 + (i % 3)), opacity: 0.3 + (i % 4) * 0.15 }} />
-      ))}
-      <div className="absolute rounded-full" style={{ left: `${spot[0] * 100}%`, top: `${spot[1] * 100}%`, width: cq(380), height: cq(380), translate: "-50% -50%",
-        background: "radial-gradient(circle at 35% 35%, #3b82f6, #1e3a8a 70%)" }} />
-    </div>
-  );
+function DemoStars() {
+  return <img src="/patterns/stars.svg" alt="" className="absolute inset-0 size-full" />;
 }

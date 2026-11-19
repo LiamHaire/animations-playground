@@ -70,6 +70,20 @@
   --stage-muted: var(--muted-foreground);
 }
 
+/* Explosion smoke, darkest to lightest: neutral tokens, one step down the scale in dark mode. */
+:root {
+  --smoke-1: var(--card);
+  --smoke-2: var(--muted);
+  --smoke-3: var(--sidebar-accent);
+  --smoke-4: var(--sidebar-ring);
+}
+.stage-light {
+  --smoke-1: var(--muted);
+  --smoke-2: var(--sidebar-accent);
+  --smoke-3: var(--sidebar-ring);
+  --smoke-4: var(--ring);
+}
+
 .stage-light {
   /* The Figma frames sit on base/sidebar-primary-foreground (#fafafa), not base/background (#ffffff). */
   --stage-bg: var(--sidebar-primary-foreground);

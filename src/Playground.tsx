@@ -46,7 +46,7 @@ const CLIPS: Clip[] = [
   { id: "scribble", name: "Scribble", kind: "Text", note: "Pen traces each glyph's outline, then its ink fills in. Lines come from scripts/gen-glyphs.cjs (from Patterns, Act 1)", Comp: ScribbleDemo },
   { id: "stretch", name: "Stretch into shapes", kind: "Text", note: "Each letter stretches out to fill an outlined block, then the row breathes and springs shut into one circle (from the Patterns title card)", Comp: StretchDemo },
   { id: "roll-dir", name: "Roll up / roll down", kind: "Text", note: "RollText now takes dir=\"up\" | \"down\", as the Patterns labels alternate", Comp: RollDirDemo },
-  { id: "zoom-through", name: "Zoom through", kind: "Transition", note: "Speed zoom out: the frame shrinks into a spot with motion blur while the next one shrinks down around it, streaks rushing out (from Patterns, jungle to Earth)", Comp: ZoomThrough },
+  { id: "zoom-through", name: "Zoom through", kind: "Transition", note: "Zoom out to a planet: the wide frame shrinks and rounds into a circle that becomes the planet, its content zooming out inside while the planet's design fades in (for Patterns, jungle to Earth)", Comp: ZoomThrough },
 ];
 
 export function Playground({ s, set }: { s: Settings; set: (p: Partial<Settings>) => void }) {
