@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import type { ClipProps } from "../play";
 import { Connectors } from "./connectors/Connectors";
-import { Patterns, PatternsAct1, PatternsTitle } from "./patterns/Patterns";
+import { Patterns, PatternsAct1, PatternsAct1V2, PatternsTitle } from "./patterns/Patterns";
 import { Explosion } from "./explosion/Explosion";
 import { AiChat } from "./ai-chat/AiChat";
 import { Notch } from "./notch/Notch";
@@ -32,8 +32,14 @@ export const ANIMATIONS: Animation[] = [
   {
     id: "patterns-act1",
     name: "Patterns: Act 1",
-    description: "Dinosaurs through to the dark frame after \"...a new era dawns\".",
+    description: "Dinosaurs through to the dark frame after \"...a new era dawns\". The meteor hit cuts to white paper.",
     Comp: PatternsAct1,
+  },
+  {
+    id: "patterns-act1-v2",
+    name: "Patterns: Act 1 v2",
+    description: "Act 1 with the hand-drawn explosion on impact: the smoke clears to empty dark and \"...a new era dawns\" is written in white.",
+    Comp: PatternsAct1V2,
   },
   {
     id: "patterns-title",

@@ -6,6 +6,7 @@ import { RollText } from "../../clips/RollText";
 import { GLITCH_MS, GLITCH_SLATE, glitch } from "../../clips/GlitchTransition";
 import { SCRIBBLE_INK, Scribble, scribble, writeMs } from "../../clips/Scribble";
 import { BIGGER, FIRST, LOUDER, MDS, MOSAIC, NOW, PUI, DAWN, TITLE } from "./glyphs";
+import { EXPLOSION_MS, EXPLOSION_ORIGIN, EXPLOSION_SIZE, EXPLOSION_START, ExplosionFrames, explode } from "../explosion/Explosion";
 
 // Scribbled text (clips/Scribble): each glyph outline is traced by the pen, then its ink settles in.
 // pace scales the whole write-on: the opening line is written faster still so the film gets going.
@@ -168,9 +169,9 @@ const NOW_DELAY = 300;
 const NOW_AT = Math.max(LOUDER_OUT_AT + OUT_MS + LINE_GAP, BITES_DONE_AT - writeMs(NOW) + 2 * STEP_MS) + NOW_DELAY;
 const NOW_OUT_AT = NOW_AT + writeMs(NOW) + PAIR_HOLD_MS;
 // As "But now..." finishes writing, the big one looks up and, after a beat, the camera rockets backwards: the jungle
-// shrinks to a speck on Earth, seen from space. A meteor streaks in and strikes that spot, an explosion in the Act 2
-// colours swallows the planet and fills the frame, and at its brightest the picture switches off like an old CRT: it
-// squashes to a glowing white line through a bright dot, the line shrinks into the dot, and the dot fades to the dark.
+// shrinks to a speck on Earth, seen from space. A meteor streaks in and strikes that spot. Then one of two endings
+// (`impact`): "cut", a hard cut to the opening's white paper; or "blast" (Act 1 v2), the hand-drawn explosion bursts out
+// of it and swallows the planet, and when its smoke clears the planet is gone: just the dark.
 const LOOKUP_AT = NOW_AT + writeMs(NOW);
 const LOOKUP_HOLD_MS = 500;
 const ZOOM_AT = LOOKUP_AT + LOOKUP_HOLD_MS;
@@ -209,11 +210,21 @@ const METEOR_ROCK = [105, 120] as const;
 const METEOR_FROM = [2030, 540] as const; // rock centre, just off the right edge, level with the planet
 const METEOR_TO = IMPACT_XY;
 const HIT_AT = METEOR_AT + METEOR_MS;
-// On impact the picture cuts straight to the paper background of the opening (Figma 264:200) and stays there.
+export type Impact = "cut" | "blast";
+// "cut": on impact the picture cuts straight to the paper background of the opening (Figma 264:200) and stays there.
+// "blast": the explosion (animations/explosion, 23 drawn frames, EXPLOSION_MS) plays with its first flash on the impact
+// point, drawn 1.5x so its fireball covers the whole planet from frame 9 to 15 (ref-frames/explosion-cover.mjs). Earth
+// is taken away under it at frame 10, and the stars fade off while it burns, so the smoke clears to empty dark.
+const BLAST_SCALE = 1.5;
+const EARTH_GONE_AT = HIT_AT + EXPLOSION_START[9];
+const STARS_OUT_MS = 700;
+const BLAST_DONE_AT = HIT_AT + EXPLOSION_MS;
 const OFF_BG = "#0a0a0a"; // dark --background token, behind everything
-// On the paper, "a new era dawns" is scribbled like the opening line (Amatic SC 96px, centred, Figma 264:201). It starts
-// 2160ms after impact, the same gap as before. It holds, then the whole frame glitches and cuts to Act 2 (Figma 264:202):
-// dark, with the same line set in Geist Medium 72px. The jump in style marks the change in pace.
+// "a new era dawns" is scribbled like the opening line (Amatic SC 96px, centred, Figma 264:201): in dark ink on the paper
+// ("cut"), or in the Act 2 white on the dark ("blast"). Either way it starts 2160ms after impact, which in "blast" lets
+// the smoke clear and the empty dark hold for a moment first. It holds, then the whole frame glitches and cuts to Act 2
+// (Figma 264:202): dark, with the same line set in Geist Medium 72px. The jump in style marks the change in pace. Both
+// endings run to the same times, so everything from the glitch on is identical.
 const DAWN_AT = HIT_AT + 2160;
 const DAWN_HOLD_MS = 1200;
 const GLITCH_AT = DAWN_AT + writeMs(DAWN) + DAWN_HOLD_MS;
@@ -770,7 +781,6 @@ const PLUME_MS = 4000;
 const PLUME_RISE = 70; // px it drifts up over one cycle
 const PLUME_LOOPS = 12; // finite so the render script can measure the clip length
 
-const INK = SCRIBBLE_INK;
 // Same white as the Figma frames: white with a faint muted wash towards the bottom right.
 const PAPER = "linear-gradient(-62.37deg, rgba(244,245,247,0.5) 8.38%, #fff 47.1%), #fff";
 
@@ -779,6 +789,15 @@ function PaperDawn({ dawnRef }: { dawnRef?: React.Ref<SVGSVGElement> }) {
   return (
     <div className="absolute inset-0" style={{ background: PAPER }}>
       <Scribble line={DAWN} ref={dawnRef} style={{ top: "50%", translate: "0 -50%" }} />
+    </div>
+  );
+}
+
+// "blast": the empty dark the smoke clears to, with the line in white (264:200's layout, dark instead of paper).
+function DarkDawn({ dawnRef }: { dawnRef?: React.Ref<SVGSVGElement> }) {
+  return (
+    <div className="absolute inset-0" style={{ background: OFF_BG }}>
+      <Scribble line={DAWN} ref={dawnRef} ink={ACT2_INK} style={{ top: "50%", translate: "0 -50%" }} />
     </div>
   );
 }
@@ -928,12 +947,17 @@ export function PatternsTitle(p: ClipProps) {
   );
 }
 
-// Act 1 alone: the dinosaurs through to the dark frame after "...a new era dawns".
+// Act 1 alone: the dinosaurs through to the dark frame after "...a new era dawns". The white cut on impact.
 export function PatternsAct1(p: ClipProps) {
   return <Patterns {...p} part="act1" />;
 }
 
-export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & { part?: "full" | "act1" }) {
+// Act 1 v2: the same, but the meteor sets off the explosion and the line is written on the dark.
+export function PatternsAct1V2(p: ClipProps) {
+  return <Patterns {...p} part="act1" impact="blast" />;
+}
+
+export function Patterns({ runKey, speed, reduced, part = "full", impact = "cut" }: ClipProps & { part?: "full" | "act1"; impact?: Impact }) {
   const title = useRef<SVGSVGElement>(null);
   const mosaic = useRef<SVGSVGElement>(null);
   const scene = useRef<HTMLDivElement>(null);
@@ -947,6 +971,7 @@ export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & 
   const louder = useRef<SVGSVGElement>(null);
   const now = useRef<SVGSVGElement>(null);
   const meteor = useRef<HTMLDivElement>(null);
+  const blast = useRef<HTMLDivElement>(null);
   const screen = useRef<HTMLDivElement>(null);
   const cut = useRef<HTMLDivElement>(null);
   const dawn = useRef<SVGSVGElement>(null);
@@ -1161,19 +1186,32 @@ export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & 
       anims,
     );
 
-    // Impact: a hard cut to the light background, which holds. No explosion.
-    play(cut.current!, [{ opacity: 1 }, { opacity: 1 }], { duration: 1, delay: HIT_AT, easing: "steps(1, start)", fill: "forwards" }, speed, anims);
+    const snap = (el: Element, opacity: number, at: number) =>
+      play(el, [{ opacity }, { opacity }], { duration: 1, delay: at, easing: "steps(1, start)", fill: "forwards" }, speed, anims);
+    if (impact === "blast") {
+      // Impact: the meteor is gone into the explosion's first flash.
+      snap(meteor.current!, 0, HIT_AT);
+      explode(blast.current!, HIT_AT, speed, reduced, anims);
+      // The planet goes while the fireball covers it; the stars fade off behind the blast.
+      snap(earthIn, 0, EARTH_GONE_AT);
+      play(stars, [{ opacity: 1 }, { opacity: 0 }], { duration: STARS_OUT_MS, delay: HIT_AT + 150, easing: "ease-in-out", fill: "forwards" }, speed, anims);
+      // Once the smoke has cleared, the dark frame that carries the line and the glitch takes over (dark on dark, unseen).
+      snap(cut.current!, 1, BLAST_DONE_AT);
+    } else {
+      // Impact: a hard cut to the light background, which holds.
+      snap(cut.current!, 1, HIT_AT);
+    }
 
-    // "a new era dawns", scribbled on the paper.
+    // "a new era dawns", scribbled on the paper or the dark.
     scribble(dawn.current!, DAWN_AT, speed, reduced, anims);
     // Full-frame glitch into Act 2 (GlitchTransition in the library).
     glitch({ layer: glitchLayer.current!, incoming: act2.current!, band: band.current!, slate: slate.current!, noise: [...noise.current!.children] as HTMLElement[] },
-      { at: GLITCH_AT, seed: 23, inkFrom: INK, inkTo: ACT2_INK, noiseY: NOISE_Y }, speed, reduced, anims);
+      { at: GLITCH_AT, seed: 23, inkFrom: impact === "blast" ? ACT2_INK : SCRIBBLE_INK, inkTo: ACT2_INK, noiseY: NOISE_Y }, speed, reduced, anims);
 
     // "...a new era dawns" fades out, clearing the way for the title card (TitleCard runs its own roll and bounce).
     play(dawnType.current!, [{ opacity: 1 }, { opacity: 0 }], { duration: DAWN_OUT_MS, delay: DAWN_OUT_AT, easing: "ease-in", fill: "forwards" }, speed, anims);
     return () => anims.forEach((a) => a.cancel());
-  }, [runKey, speed, reduced, part]);
+  }, [runKey, speed, reduced, part, impact]);
 
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: OFF_BG }}>
@@ -1331,13 +1369,25 @@ export function Patterns({ runKey, speed, reduced, part = "full" }: ClipProps & 
       <img src="/patterns/meteor.svg" alt="" className="absolute inset-0 size-full" />
     </div>
 
+    {/* "blast": the explosion, its first flash on the impact point. */}
+    {impact === "blast" && <ExplosionFrames
+      ref={blast}
+      className="pointer-events-none absolute"
+      style={{
+        left: cq(IMPACT_XY[0] - EXPLOSION_ORIGIN[0] * BLAST_SCALE),
+        top: cq(IMPACT_XY[1] - EXPLOSION_ORIGIN[1] * BLAST_SCALE),
+        width: cq(EXPLOSION_SIZE[0] * BLAST_SCALE),
+        height: cq(EXPLOSION_SIZE[1] * BLAST_SCALE),
+      }}
+    />}
+
     </div>
 
-      {/* The cut on impact: the opening's paper covers everything and stays, with "a new era dawns" written on it (264:200).
-          Wrapped with the Act 2 frame so the full-frame glitch moves both. */}
+      {/* After impact: the opening's paper ("cut", 264:200) or, once the smoke clears, the empty dark ("blast"), with
+          "a new era dawns" written on it. Wrapped with the Act 2 frame so the full-frame glitch moves both. */}
       <div ref={cut} className="absolute inset-0 opacity-0">
         <div ref={glitchLayer} className="absolute inset-0">
-          <PaperDawn dawnRef={dawn} />
+          {impact === "blast" ? <DarkDawn dawnRef={dawn} /> : <PaperDawn dawnRef={dawn} />}
           {/* Act 2: "...a new era dawns", which fades for the title card. */}
           <DarkFrame ref={act2}>
             <div ref={dawnType} className="absolute inset-0">

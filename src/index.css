@@ -70,18 +70,14 @@
   --stage-muted: var(--muted-foreground);
 }
 
-/* Explosion smoke, darkest to lightest: neutral tokens, one step down the scale in dark mode. */
+/* tailwind neutral scale (the one the semantic tokens above come from). The explosion smoke uses these, the same in both
+   themes, as in the Figma frames. */
 :root {
-  --smoke-1: var(--card);
-  --smoke-2: var(--muted);
-  --smoke-3: var(--sidebar-accent);
-  --smoke-4: var(--sidebar-ring);
-}
-.stage-light {
-  --smoke-1: var(--muted);
-  --smoke-2: var(--sidebar-accent);
-  --smoke-3: var(--sidebar-ring);
-  --smoke-4: var(--ring);
+  --neutral-500: #737373;
+  --neutral-600: #525252;
+  --neutral-700: #404040;
+  --neutral-800: #262626;
+  --neutral-900: #171717;
 }
 
 .stage-light {
