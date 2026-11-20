@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { BREATHE_EASE, type ClipProps, ROLL, SPRING, cq, goFor, play, spring, springEase } from "../../play";
 import { type ShapeKind, breatheSnap, fitBox, fitShapes, layoutBox, stretchInto } from "../../clips/StretchText";
 import { BounceText, bounceLength } from "../../clips/BounceTitle";
@@ -366,8 +366,112 @@ const PERSON_TUCK = 50; // frame units: how far in, behind the front one, the ba
 const PEOPLE_CX = BLOCKS_CX + 2 * ROW_STEP;
 const COLLAB_WORD_AT = beats(22);
 const COLLAB_WORD_TEXT = "Collaboration";
-// The title card ends holding on the row for two beats, for now: the story picks up from here.
-const TITLE_END = beats(24);
+// After two beats on the row, it all adds up: the row fades away on 24 and an equals sign (Figma 320:154, the same two
+// 80x10 bars as the plus) fades in in the middle of the frame on 24.5. On 25.5 it inflates like the letters in
+// "Inflate + pop", swelling and wobbling as it rises, and on 26.5 it pops, throwing off a ring and droplets.
+const ROW_OUT_AT = beats(24);
+const ROW_OUT_MS = beats(0.5);
+const EQ_IN_AT = beats(24.5);
+const EQ_IN_MS = beats(0.5);
+const EQ_INFLATE_AT = beats(25.5);
+const EQ_POP_AT = beats(26.5);
+const EQ_POP_MS = 60; // PopText's: the pop itself is near instant
+const EQ_SWELL = 1.3; // how big it has inflated by the time it pops
+const EQ_DROPS = [-75, -25, 30, 80, 135, 205, 250]; // droplet angles, degrees from the right
+// Out of the pop comes what it equals: "better working" (Figma 320:184), Geist Regular at IX PATTERNS's 128px rather than
+// Figma's 112, "better" in the yellow-to-orange gradient, "working" white, either side of the frame's centre. A beat after
+// the pop (its ring and droplets are gone by 27, then half a beat of empty dark), it grows out of where the sign was, a
+// touch past its size, and settles on 28, then holds.
+const BETTER_AT = EQ_POP_AT + beats(1);
+const BETTER_MS = beats(0.5);
+const BETTER_SIZE = 128;
+const BETTER_GAP = (24 * BETTER_SIZE) / 112; // Figma's 24px gap between the words, scaled with the type
+const BETTER_GRADIENT = "linear-gradient(154.42deg, #EAB308 35%, #EA580C 60%)";
+// Then the words roll on like drums, every two beats, each roll half a beat. The orange word rolls up (the new word
+// comes up from below as the old one goes over the top): better → smarter on 29, → faster on 31. Then the white word
+// rolls down the other way, working → building on 33, and the orange one carries on up: → simpler on 35, → unified on
+// 37. The orange words all share better's right edge and the white ones working's left edge, so the line stays put
+// about the gap between them.
+const BETTER_WORDS = ["better", "smarter", "faster", "simpler", "unified"];
+const WORD_ROLL_AT = [beats(29), beats(31), beats(35), beats(37)]; // when each next orange word starts rolling in
+const WORKING_WORDS = ["working", "building"];
+const WORKING_ROLL_AT = [beats(33)]; // when each next white word starts rolling in
+const WORD_ROLL_MS = beats(0.5);
+// Then (Figma 349:1802) the orange word becomes the frame round a counter, the way "introducing" became its box. On 39
+// "building" rolls away down as "unified" stretches, where it is, into a square, and its 8px gradient outline takes
+// over. On 39.5 the square springs across to the middle; then it opens out, wide (40 to 40.5) and then tall (40.5 to
+// 41), overshooting each time and settling. On 41 the counter is in: the dividers draw down, the labels fade up and the
+// three numbers spin like odometer reels, stopping one per beat, left to right: components on 42, patterns on 43,
+// modules on 44. "(and counting)" rolls up under it on 45.
+const WORD_OUT_AT = beats(39);
+const TO_SQUARE_AT = beats(39);
+const TO_SQUARE_MS = beats(0.5);
+const SQUARE = 120; // frame units: the square the word stretches into, centred on its ink
+const SQUARE_R = 28;
+const MOVE_AT = beats(39.5);
+const MOVE_MS = beats(0.5);
+const WIDE_AT = beats(40);
+const WIDE_MS = beats(0.5);
+const TALL_AT = beats(40.5);
+const TALL_MS = beats(0.5);
+const FRAME_W = 1200;
+const FRAME_H = 323;
+const FRAME_R = 48;
+const FRAME_STROKE = 8;
+const FRAME_DY = -21.5; // Figma centres the frame and the counter 21.5px above the middle of the frame
+const FRAME_GRADIENT = "linear-gradient(164deg, #EAB308 36%, #EA580C 60%)"; // fitted to Figma's render of the stroke
+const COUNTER_AT = beats(41);
+const COUNTS = ["56", "25", "31"]; // the library so far (Liam, 2026-11-20): each character's reel lands on its digit
+const COUNT_LABELS = ["components", "patterns", "modules"];
+const COUNT_STOP_AT = [beats(42), beats(43), beats(44)];
+const REEL_RATE = (d: number) => 5 + 1.5 * d; // digits per beat, each reel faster than the one on its left, like an odometer
+const REEL_MASK = "linear-gradient(transparent, #000 12%, #000 88%, transparent)";
+const AND_AT = beats(45);
+const AND_TEXT = "(and counting)";
+const AND_TOP = 164 + 32; // frame units below the middle of the frame: Figma's 164, moved down 32 (Liam: down a bit)
+// What each reel shows, top to bottom: digits counting up, 0 to 9 and round again, ending on the one it stops at, so it
+// rolls straight on into its number. A character that isn't a digit just ends a run of digits from 0.
+const reelGlyphs = (n: number, d: number) => {
+  const count = Math.max(3, Math.round((REEL_RATE(d) * (COUNT_STOP_AT[n] - COUNTER_AT)) / BEAT));
+  const end = COUNTS[n][d];
+  const last = /\d/.test(end) ? Number(end) : null;
+  const start = last === null ? 0 : (((last - count) % 10) + 10) % 10;
+  return [...Array.from({ length: count }, (_, i) => String((start + i) % 10)), end];
+};
+// Then (Figma 266:204) it all comes back to one point. On 46.5 the numbers, labels, dividers and "(and counting)" fade.
+// On 47 the frame springs shut to its square; on 47.5 the square collapses into a solid gradient dot the size of a
+// lower-case letter; on 48 the dot rolls across to where the n at the end of "evolution" will be, turning as it goes.
+// On 48.5 it becomes the n and the word unspools backwards out of it, each letter flung out from behind the one to its
+// right, the e landing on 49.5. A caret appears in front of it, blinks, and "not just" is typed in, a key every quarter
+// beat from 50.25, the last on 52; the caret fades out on 52.5.
+const COUNTER_OUT_AT = beats(46.5);
+const COUNTER_OUT_MS = beats(0.5);
+const CLOSE_AT = beats(47);
+const CLOSE_MS = beats(0.5);
+const DOTIFY_AT = beats(47.5);
+const DOTIFY_MS = beats(0.5);
+const DOT_ROLL_AT = beats(48);
+const DOT_ROLL_MS = beats(0.5);
+const UNSPOOL_AT = beats(48.5);
+const UNSPOOL_MS = beats(0.5); // each letter's flight
+const UNSPOOL_SPREAD = beats(0.5); // from the n to the e starting
+const EVO_WORD = "evolution";
+const NOT_JUST = "not just";
+const EVO_GRADIENT = "linear-gradient(170.87deg, #EAB308 35%, #EA580C 60%)";
+const EVO_LEFT = 960 - 293; // Figma: the line's left and top edges, Geist Medium 72px
+const EVO_TOP = 540 - 47;
+const CARET_AT = beats(49.5);
+const TYPE_AT = beats(50.25);
+const TYPE_STEP = beats(0.25);
+const CARET_OUT_AT = beats(52.5);
+// Then on 53 it glitches, the same full-frame glitch as after the meteor, into "[ revolution ]" (Figma 266:207), whose
+// "evolution" sits exactly where the old one was. Stretched from 600ms to a beat and a half so it lands on 54.5.
+const REV_GLITCH_AT = beats(53);
+const REV_GLITCH_MS = beats(1.5);
+const REV_LEFT = 960 - 89; // Figma: the line's left edge; its top is EVO_TOP
+const REV_GRADIENT = "linear-gradient(167.5deg, #EAB308 35%, #EA580C 60%)";
+// The title card ends holding on "[ revolution ]" for 1.5 beats, for now: the story picks up from here.
+const TITLE_END = beats(56);
 // Figma 267:44: one outlined shape per letter (spaces skipped), stroke 4px; these are the circles. Each shape is sized
 // to its letter's ink at runtime (fitShapes), so it swells out of exactly where the letter was.
 const SHAPE_GAP = 0.5; // the gaps within each word, as a fraction of the even letter spacing
@@ -381,7 +485,7 @@ const SNAP_START = BREATHE_START + BREATHE_MS;
 // same timeline origin as everything else (`t0`) rather than from when they were built.
 function condense(root: HTMLElement, word: HTMLElement, intro: HTMLElement, blocks: HTMLElement[], box: HTMLElement, ring: HTMLElement, dot: HTMLElement, icon: HTMLElement, iconFill: SVGPathElement, word2: HTMLElement, plus: SVGSVGElement,
   blocksIcon: SVGSVGElement, word3: HTMLElement,
-  plus2: SVGSVGElement, people: SVGSVGElement, word4: HTMLElement, at: number, t0: CSSNumberish | null, speed: number, reduced: boolean): Animation[] {
+  plus2: SVGSVGElement, people: SVGSVGElement, word4: HTMLElement, eq: SVGSVGElement, better: HTMLElement, counter: HTMLElement, evo: HTMLElement, at: number, t0: CSSNumberish | null, speed: number, reduced: boolean): Animation[] {
   const anims: Animation[] = [];
   const go = goFor(speed, reduced, anims, t0, at);
   const px = (n: number) => `${n}px`;
@@ -598,6 +702,226 @@ function condense(root: HTMLElement, word: HTMLElement, intro: HTMLElement, bloc
   // The document's two lines draw on, top then bottom.
   icon.querySelectorAll("[data-line]").forEach((line, i) =>
     go(line, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], i ? LINE_BOTTOM_AT : LINE_TOP_AT, LINE_MS, "cubic-bezier(0.65, 0, 0.35, 1)"));
+
+  // The row fades away. Last, so it overrides the opacities the pieces arrived with.
+  [icon, word2, plus, blocksIcon, word3, plus2, people, word4].forEach((el) =>
+    go(el, [{ opacity: 1 }, { opacity: 0 }], ROW_OUT_AT, ROW_OUT_MS, "ease-in"));
+  // The equals sign fades in, inflates (swelling and wobbling as it rises, like PopText's letters), then pops.
+  const sq = (k: number, deg = 0, y = 0) => `translate(0px, ${y}px) rotate(${deg}deg) scale(${k})`;
+  const sign = eq.querySelector("[data-eq]")!;
+  go(sign, [{ opacity: 0 }, { opacity: 1 }], EQ_IN_AT, EQ_IN_MS, "ease-out");
+  go(sign, [
+    { transform: sq(1), offset: 0 },
+    { transform: sq(1 + (EQ_SWELL - 1) * 0.4, -3, -2), offset: 0.4 },
+    { transform: sq(1 + (EQ_SWELL - 1) * 0.75, 2.5, -4), offset: 0.75 },
+    { transform: sq(EQ_SWELL, 0, -5), offset: 1 },
+  ], EQ_INFLATE_AT, EQ_POP_AT - EQ_INFLATE_AT, "cubic-bezier(0.55, 0, 0.92, 0.5)");
+  go(sign, [{ transform: sq(EQ_SWELL, 0, -5), opacity: 1 }, { transform: sq(EQ_SWELL * 1.3, 0, -7), opacity: 0 }],
+    EQ_POP_AT, EQ_POP_MS, "cubic-bezier(.2,.7,.4,1)");
+  go(eq.querySelector("[data-pop-ring]")!, [{ transform: sq(0.5, 0, -5), opacity: 0.9 }, { transform: sq(1.7, 0, -5), opacity: 0 }],
+    EQ_POP_AT, PLUS_RING_MS, "cubic-bezier(.2,.7,.4,1)");
+  eq.querySelectorAll("[data-drop]").forEach((d, k) => {
+    const a = (EQ_DROPS[k] * Math.PI) / 180, r = 80 + (k % 3) * 10;
+    go(d, [
+      { transform: "translate(0px, -5px) scale(1)", opacity: 1 },
+      { transform: `translate(${Math.cos(a) * r}px, ${Math.sin(a) * r - 5}px) scale(0.3)`, opacity: 0 },
+    ], EQ_POP_AT, beats(0.5), "cubic-bezier(.2,.7,.4,1)");
+  });
+  // "better working" grows out of the pop, about the frame's centre where the sign was.
+  go(better, [
+    { scale: "0.3", opacity: 0, offset: 0, easing: "cubic-bezier(0.2, 0.7, 0.4, 1)" },
+    { scale: "1.04", opacity: 1, offset: 0.55, easing: "cubic-bezier(0.4, 0, 0.6, 1)" },
+    { scale: "1", opacity: 1, offset: 1 },
+  ], BETTER_AT, BETTER_MS, "linear");
+  // The words roll on: each one turns away as the next turns in, on the same drum as the labels (radius 0.55em,
+  // perspective in its own transform so it turns about its own centre). Up: the new word comes up from below; down: from
+  // above.
+  const wDepth = 0.55 * BETTER_SIZE * s;
+  const roll = (deg: number) => `${persp} rotateX(${deg}deg)`;
+  const rollWords = (sel: string, times: number[], dir: "up" | "down") => {
+    const turn = dir === "up" ? 90 : -90;
+    better.querySelectorAll<HTMLElement>(sel).forEach((w, i, all) => {
+      Object.assign(w.style, { transformOrigin: `50% 50% ${-wDepth}px`, backfaceVisibility: "hidden" });
+      if (i > 0) go(w, [{ transform: roll(-turn), opacity: 1 }, { transform: roll(0), opacity: 1 }], times[i - 1], WORD_ROLL_MS, ROLL);
+      if (i < all.length - 1) go(w, [
+        { transform: roll(0), opacity: 1 },
+        { transform: roll(turn), opacity: 1, offset: 0.99 },
+        { transform: roll(turn), opacity: 0 },
+      ], times[i], WORD_ROLL_MS, ROLL);
+    });
+  };
+  rollWords("[data-better-word]", WORD_ROLL_AT, "up");
+  rollWords("[data-working-word]", WORKING_ROLL_AT, "down");
+
+  // The counter. "building" rolls away down, as "unified" stretches into a square where it is (as "introducing" did
+  // into its box: stretchInto's keyframes, but here as translate and scale, since the word's transform origin belongs
+  // to its roll).
+  const orange = [...better.querySelectorAll<HTMLElement>("[data-better-word]")];
+  const white = [...better.querySelectorAll<HTMLElement>("[data-working-word]")];
+  const uni = orange[orange.length - 1];
+  go(white[white.length - 1], [
+    { transform: roll(0), opacity: 1 },
+    { transform: roll(-90), opacity: 1, offset: 0.99 },
+    { transform: roll(-90), opacity: 0 },
+  ], WORD_OUT_AT, WORD_ROLL_MS, ROLL);
+  const H = parseFloat(getComputedStyle(root).height);
+  const fcx = W / 2, fcy = H / 2 + FRAME_DY * s;
+  // The word's ink, in the card's coordinates. It sits centred on its top (translate -50%), so its box starts half its
+  // height above that.
+  const ub = layoutBox(uni);
+  const uh = uni.offsetHeight;
+  const ctx = document.createElement("canvas").getContext("2d")!;
+  ctx.font = getComputedStyle(uni).font;
+  const m = ctx.measureText(uni.textContent!);
+  const baseline = (uh - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+  const ex = ub.l, ey = ub.t - uh / 2;
+  const ink = { l: ex - m.actualBoundingBoxLeft, t: ey + baseline - m.actualBoundingBoxAscent,
+    w: m.actualBoundingBoxLeft + m.actualBoundingBoxRight, h: m.actualBoundingBoxAscent + m.actualBoundingBoxDescent };
+  const icx = ink.l + ink.w / 2, icy = ink.t + ink.h / 2;
+  const sqPx = SQUARE * s;
+  // Scaled about the word's own centre, moved so its ink's centre stays put.
+  const sx = sqPx / ink.w, sy = sqPx / ink.h;
+  const ecx = ex + ub.w / 2, ecy = ey + uh / 2;
+  const tx = (icx - ecx) * (1 - sx), ty = (icy - ecy) * (1 - sy);
+  const toSquare = (k: number) => ({ translate: `${tx * k}px calc(-50% + ${ty * k}px)`, scale: `${1 + (sx - 1) * k} ${1 + (sy - 1) * k}` });
+  go(uni, [
+    { ...toSquare(0), opacity: 1, offset: 0, easing: "cubic-bezier(0.5, 0, 0.75, 0)" },
+    { ...toSquare(1.06), opacity: 1, offset: 0.5, easing: "cubic-bezier(0.2, 0.7, 0.4, 1)" },
+    { ...toSquare(1), opacity: 0, offset: 0.75 },
+    { ...toSquare(1), opacity: 0, offset: 1 },
+  ], TO_SQUARE_AT, TO_SQUARE_MS);
+  // The square's outline arrives as the word fills it, slightly big (matching its overshoot), and settles to size.
+  const frame = counter.querySelector<HTMLElement>("[data-frame]")!;
+  const rect = (cx: number, cy: number, w: number, h: number, r: number) =>
+    ({ left: px(cx - w / 2), top: px(cy - h / 2), width: px(w), height: px(h), borderRadius: px(r * s) });
+  go(frame, [
+    { opacity: 0, scale: "1.06", offset: 0 },
+    { opacity: 0, scale: "1.06", offset: 0.4, easing: "ease-out" },
+    { opacity: 1, scale: "1.04", offset: 0.55, easing: "cubic-bezier(0.2, 0.7, 0.4, 1)" },
+    { opacity: 1, scale: "1", offset: 1 },
+  ], TO_SQUARE_AT, TO_SQUARE_MS);
+  // Then it springs across to the middle (held where the word was until then).
+  const xs = spring(icx, fcx, 0.06), ys = spring(icy, fcy, 0.06);
+  const hold = (MOVE_AT - TO_SQUARE_AT) / (MOVE_AT + MOVE_MS - TO_SQUARE_AT);
+  go(frame, [
+    { ...rect(icx, icy, sqPx, sqPx, SQUARE_R), offset: 0 },
+    ...SPRING.map((o, k) => ({ ...rect(xs[k], ys[k], sqPx, sqPx, SQUARE_R), offset: hold + o * (1 - hold), ...ease(k) })),
+  ], TO_SQUARE_AT, MOVE_AT + MOVE_MS - TO_SQUARE_AT);
+  // Then it opens out, wide, then tall.
+  const ws = spring(sqPx, FRAME_W * s, 0.06);
+  const rs = [SQUARE_R, FRAME_R, FRAME_R, FRAME_R];
+  go(frame, SPRING.map((o, k) => ({ offset: o, left: px(fcx - ws[k] / 2), width: px(ws[k]), borderRadius: px(rs[k] * s), ...ease(k) })), WIDE_AT, WIDE_MS);
+  const hs = spring(sqPx, FRAME_H * s, 0.1);
+  go(frame, SPRING.map((o, k) => ({ offset: o, top: px(fcy - hs[k] / 2), height: px(hs[k]), ...ease(k) })), TALL_AT, TALL_MS);
+
+  // The counter comes in: the dividers draw down and the labels fade up.
+  counter.querySelectorAll("[data-divider]").forEach((el) =>
+    go(el, [{ scale: "1 0", opacity: 1 }, { scale: "1 1", opacity: 1 }], COUNTER_AT, beats(0.5), "cubic-bezier(0.22, 1, 0.36, 1)"));
+  counter.querySelectorAll("[data-count-label]").forEach((el) =>
+    go(el, [{ opacity: 0, translate: `0 ${12 * s}px` }, { opacity: 1, translate: "0 0" }], COUNTER_AT, beats(0.5), "ease-out"));
+  // The numbers spin in already turning. Each reel runs at a steady speed, then slows over its last two digits to land
+  // on its beat; the ease-out starts at 3x the average speed of its stretch, so the hand-over doesn't jolt.
+  counter.querySelectorAll<HTMLElement>("[data-count]").forEach((el, n) => {
+    go(el, [{ opacity: 0 }, { opacity: 1 }], COUNTER_AT, beats(0.25), "ease-out");
+    el.querySelectorAll<HTMLElement>("[data-reel]").forEach((strip) => {
+      const h = parseFloat(getComputedStyle(strip.firstElementChild!).height);
+      const D = (strip.children.length - 1) * h;
+      const a = (D - 2 * h) / (D + 4 * h);
+      go(strip, [
+        { transform: "translateY(0px)", offset: 0, easing: "linear" },
+        { transform: `translateY(${-(D - 2 * h)}px)`, offset: a, easing: "cubic-bezier(0.25, 0.75, 0.5, 1)" },
+        { transform: `translateY(${-D}px)`, offset: 1 },
+      ], COUNTER_AT, COUNT_STOP_AT[n] - COUNTER_AT);
+    });
+    // A little knock as it lands.
+    go(el, [{ scale: "1" }, { scale: "1.06", offset: 0.35 }, { scale: "1" }], COUNT_STOP_AT[n], beats(0.5), "cubic-bezier(0.2, 0.7, 0.4, 1)");
+  });
+  // Once they've all stopped, "(and counting)" rolls up under the frame, on the same drum as the labels.
+  const and = counter.querySelector<HTMLElement>("[data-and]")!;
+  Object.assign(and.style, { transformOrigin: `50% 50% ${-0.55 * 64 * s}px`, backfaceVisibility: "hidden" });
+  go(and, [{ transform: `${persp} rotateX(-90deg)`, opacity: 1 }, { transform: `${persp} rotateX(0deg)`, opacity: 1 }], AND_AT, WORD_MS, ROLL);
+
+  // Back to one point. Everything inside the frame fades.
+  counter.querySelectorAll("[data-count], [data-count-label], [data-divider], [data-and]").forEach((el) =>
+    go(el, [{ opacity: 1 }, { opacity: 0 }], COUNTER_OUT_AT, COUNTER_OUT_MS, "ease-in"));
+  // Where the n of "evolution" will be: its ink, a circle that size on its middle.
+  const line = evo.querySelector<HTMLElement>("[data-evo-line]")!;
+  // Every character is its own inline block so it can move, which loses the font's kerning between them; put it back as
+  // a margin after each one (the pair's width less the two on their own).
+  const chars = [...line.querySelectorAll<HTMLElement>("[data-type-char], [data-space], [data-evo-letter]")];
+  ctx.font = getComputedStyle(line).font;
+  const wOf = (t: string) => ctx.measureText(t).width;
+  chars.forEach((c, i) => {
+    const next = chars[i + 1]?.textContent;
+    c.style.marginRight = next ? px(wOf(c.textContent! + next) - wOf(c.textContent!) - wOf(next)) : "";
+  });
+  const lb = layoutBox(line);
+  const evoWord = line.querySelector<HTMLElement>("[data-evo-word]")!;
+  const letters = [...line.querySelectorAll<HTMLElement>("[data-evo-letter]")];
+  // Each letter carries the whole word's gradient, offset to its own place, so splitting it up doesn't restart it.
+  letters.forEach((l) => Object.assign(l.style, {
+    backgroundSize: `${evoWord.offsetWidth}px ${evoWord.offsetHeight}px`,
+    backgroundPosition: `${-(l.offsetLeft - evoWord.offsetLeft)}px ${-(l.offsetTop - evoWord.offsetTop)}px`,
+  }));
+  const n = letters[letters.length - 1];
+  ctx.font = getComputedStyle(n).font;
+  const nm = ctx.measureText("n");
+  const nBase = (n.offsetHeight - (nm.fontBoundingBoxAscent + nm.fontBoundingBoxDescent)) / 2 + nm.fontBoundingBoxAscent;
+  const dotD = nm.actualBoundingBoxAscent + nm.actualBoundingBoxDescent; // the n's x-height
+  const nInkMid = nBase - nm.actualBoundingBoxAscent + dotD / 2; // in the letter's own box
+  const centreX = (el: HTMLElement) => lb.l + el.offsetLeft + el.offsetWidth / 2;
+  const nx = centreX(n), ny = lb.t + n.offsetTop + nInkMid;
+  // The frame springs shut to its square...
+  const cw = spring(FRAME_W * s, sqPx, 0.08, 0.6), ch = spring(FRAME_H * s, sqPx, 0.1, 0.6);
+  const cr = [FRAME_R, SQUARE_R, SQUARE_R, SQUARE_R];
+  go(frame, SPRING.map((o, k) => ({ offset: o, ...rect(fcx, fcy, cw[k], ch[k], cr[k]), ...ease(k) })), CLOSE_AT, CLOSE_MS);
+  // ...then collapses into a solid dot: its border thickens as it shrinks until there's no inside left.
+  const dotR = dotD / 2 / s; // rect() takes corner radii in frame units
+  go(frame, [
+    { ...rect(fcx, fcy, sqPx, sqPx, SQUARE_R), borderWidth: px(FRAME_STROKE * s), offset: 0, easing: "cubic-bezier(0.6, 0, 0.9, 0.5)" },
+    { ...rect(fcx, fcy, dotD * 0.8, dotD * 0.8, dotR * 0.8), borderWidth: px(dotD * 0.4), offset: 0.7, easing: "cubic-bezier(0.2, 0.7, 0.4, 1)" },
+    { ...rect(fcx, fcy, dotD, dotD, dotR), borderWidth: px(dotD / 2), offset: 1 },
+  ], DOTIFY_AT, DOTIFY_MS);
+  // It rolls across to the n, turning as far as a ball that size would (its gradient shows it turning).
+  const turns = (Math.hypot(nx - fcx, ny - fcy) / (Math.PI * dotD)) * 360;
+  go(frame, [
+    { ...rect(fcx, fcy, dotD, dotD, dotR), rotate: "0deg" },
+    { ...rect(nx, ny, dotD, dotD, dotR), rotate: `${turns}deg` },
+  ], DOT_ROLL_AT, DOT_ROLL_MS, "cubic-bezier(0.45, 0, 0.2, 1)");
+  // It becomes the n: the dot gives way as the letter swells out of it.
+  go(frame, [{ opacity: 1, scale: "1" }, { opacity: 0, scale: "0.7" }], UNSPOOL_AT, beats(0.2), "ease-in");
+  n.style.transformOrigin = `50% ${nInkMid}px`;
+  go(n, [
+    { opacity: 0, scale: "0.6", offset: 0 },
+    { opacity: 1, scale: "1.08", offset: 0.45, easing: "cubic-bezier(0.4, 0, 0.6, 1)" },
+    { opacity: 1, scale: "1", offset: 1 },
+  ], UNSPOOL_AT, UNSPOOL_MS, "cubic-bezier(0.2, 0.7, 0.4, 1)");
+  // Then the rest unspools backwards out of it, right to left, each letter flung out from behind the n to its place.
+  const behind = letters.slice(0, -1).reverse();
+  behind.forEach((l, k) => {
+    l.style.transformOrigin = `50% ${nInkMid}px`;
+    go(l, [
+      { translate: `${nx - centreX(l)}px 0`, opacity: 0, scale: "0.6", offset: 0 },
+      { opacity: 1, offset: 0.2 },
+      { translate: "0 0", opacity: 1, scale: "1", offset: 1 },
+    ], UNSPOOL_AT + ((k + 1) * UNSPOOL_SPREAD) / behind.length, UNSPOOL_MS, "cubic-bezier(0.22, 1, 0.36, 1)");
+  });
+  // "not just" is typed in front of it. Each key and caret move is a held keyframe, so it steps like real typing, and
+  // runs off the same clock as everything else so a render is frame-exact.
+  const keys = [...line.querySelectorAll<HTMLElement>("[data-type-char]")];
+  const caret = line.querySelector<HTMLElement>("[data-caret]")!;
+  const gap = 0.081 * 72 * s; // TypeText's caret spacing
+  const at1 = (el: HTMLElement, kf: Keyframe, t: number) => go(el, [kf, kf], t, 1);
+  caret.style.left = px(keys[0].offsetLeft);
+  at1(caret, { opacity: 1 }, CARET_AT);
+  at1(caret, { opacity: 0 }, CARET_AT + beats(0.25));
+  at1(caret, { opacity: 1 }, CARET_AT + beats(0.5));
+  keys.forEach((k, i) => {
+    const t = TYPE_AT + i * TYPE_STEP;
+    at1(k, { opacity: 1 }, t);
+    at1(caret, { left: px(k.offsetLeft + k.offsetWidth + gap) }, t);
+  });
+  go(caret, [{ opacity: 1 }, { opacity: 0 }], CARET_OUT_AT, beats(0.5), "cubic-bezier(.4, 0, .2, 1)");
   return anims;
 }
 const BOX_ORANGE = ACT2_ACCENT;
@@ -655,6 +979,25 @@ function PlusPop({ ref, cx, drawn }: { ref?: React.Ref<SVGSVGElement>; cx: numbe
           <path transform="translate(-40 -40)" d="M40 0C42.7614 0 45 2.23858 45 5V35H75C77.7614 35 80 37.2386 80 40C80 42.7614 77.7614 45 75 45H45V75C45 77.7614 42.7614 80 40 80C37.2386 80 35 77.7614 35 75V45H5C2.23858 45 0 42.7614 0 40C0 37.2386 2.23858 35 5 35H35V5C35 2.23858 37.2386 0 40 0Z"
             fill={ACT2_INK} />
         )}
+      </g>
+    </svg>
+  );
+}
+
+// The equals sign, Figma 320:154 (two of the plus's 80x10 bars, 34px apart), with the ring and droplets it pops into,
+// drawn in frame units about its centre, the middle of the frame.
+function EqualsPop({ ref }: { ref?: React.Ref<SVGSVGElement> }) {
+  return (
+    <svg ref={ref} viewBox="-240 -240 480 480" className="pointer-events-none absolute overflow-visible" aria-hidden
+      style={{ left: cq(960 - 240), top: cq(540 - 240), width: cq(480), height: cq(480) }}>
+      <circle data-pop-ring r={60} fill="none" stroke={ACT2_INK} strokeWidth={4} opacity={0} style={SVG_ORIGIN} />
+      {EQ_DROPS.map((a) => (
+        <circle key={a} data-drop r={4} fill={ACT2_INK} opacity={0} style={SVG_ORIGIN} />
+      ))}
+      <g data-eq opacity={0} style={SVG_ORIGIN}>
+        {[-22, 12].map((y) => (
+          <rect key={y} x={-40} y={y} width={80} height={10} rx={5} fill={ACT2_INK} />
+        ))}
       </g>
     </svg>
   );
@@ -839,6 +1182,15 @@ function TitleCard({ at, ...p }: ClipProps & { at: number }) {
   const plus2 = useRef<SVGSVGElement>(null);
   const people = useRef<SVGSVGElement>(null);
   const collabLabel = useRef<HTMLParagraphElement>(null);
+  const equals = useRef<SVGSVGElement>(null);
+  const better = useRef<HTMLDivElement>(null);
+  const counter = useRef<HTMLDivElement>(null);
+  const evo = useRef<HTMLDivElement>(null);
+  const revLayer = useRef<HTMLDivElement>(null);
+  const rev = useRef<HTMLDivElement>(null);
+  const revBand = useRef<HTMLDivElement>(null);
+  const revSlate = useRef<HTMLDivElement>(null);
+  const revNoise = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const { speed, reduced } = p;
@@ -866,7 +1218,14 @@ function TitleCard({ at, ...p }: ClipProps & { at: number }) {
       const it = introText.current!;
       if (boxFit) stretchInto(it, box.current!, boxFit.ink, boxFit.box, { l: it.offsetLeft, t: it.offsetTop },
         MORPH_AT, clock.startTime, speed, reduced, squeeze, morph);
-      squeeze.push(...condense(root.current!, word.current!, intro.current!, blocks, box.current!, ring.current!, dot.current!, icon.current!, iconFill.current!, label.current!, plus.current!, blocksIcon.current!, blocksLabel.current!, plus2.current!, people.current!, collabLabel.current!, at, clock.startTime, speed, reduced));
+      squeeze.push(...condense(root.current!, word.current!, intro.current!, blocks, box.current!, ring.current!, dot.current!, icon.current!, iconFill.current!, label.current!, plus.current!, blocksIcon.current!, blocksLabel.current!, plus2.current!, people.current!, collabLabel.current!, equals.current!, better.current!, counter.current!, evo.current!, at, clock.startTime, speed, reduced));
+      // The glitch into "[ revolution ]", the meteor's glitch, slowed to land on the beat. Rebuilt with the rest so it
+      // starts on the same timeline origin.
+      const rg: Animation[] = [];
+      glitch({ layer: revLayer.current!, incoming: rev.current!, band: revBand.current!, slate: revSlate.current!, noise: [...revNoise.current!.children] as HTMLElement[] },
+        { at: at + REV_GLITCH_AT, seed: 23, duration: REV_GLITCH_MS, inkFrom: ACT2_INK, inkTo: ACT2_INK, noiseY: NOISE_Y }, speed, reduced, rg);
+      rg.forEach((a) => (a.startTime = clock.startTime));
+      squeeze.push(...rg);
       if (clock.playState === "paused") squeeze.forEach((a) => { a.pause(); a.currentTime = clock.currentTime; });
     };
     fit();
@@ -933,6 +1292,128 @@ function TitleCard({ at, ...p }: ClipProps & { at: number }) {
       <p ref={blocksLabel} className="pointer-events-none absolute opacity-0"
         style={{ ...ACT2_TYPE, fontWeight: 400, fontSize: cq(48), transform: "translate(-50%, -50%)" }}>
         {BLOCKS_WORD_TEXT}
+      </p>
+      {/* What the row adds up to (Figma 320:154), in the middle of the frame once the row has gone. */}
+      <EqualsPop ref={equals} />
+      {/* What it equals (Figma 320:184): the words either side of the centre, which is where it grows from. */}
+      <div ref={better} className="pointer-events-none absolute inset-0 opacity-0" aria-label="better, smarter, faster working; simpler, unified building"
+        style={{ fontFamily: "var(--font-geist)", fontWeight: 400, fontSize: cq(BETTER_SIZE), lineHeight: "normal", whiteSpace: "nowrap" }}>
+        {/* The orange words stacked on one right edge, the white ones on one left edge; all but the first of each start
+            hidden until they roll in. */}
+        {BETTER_WORDS.map((w, i) => (
+          <p key={w} data-better-word className={`absolute text-transparent ${i ? "opacity-0" : ""}`} aria-hidden
+            style={{ right: cq(960 + BETTER_GAP / 2), top: "50%", translate: "0 -50%", backgroundImage: BETTER_GRADIENT,
+              backgroundClip: "text", WebkitBackgroundClip: "text" }}>
+            {w}
+          </p>
+        ))}
+        {WORKING_WORDS.map((w, i) => (
+          <p key={w} data-working-word className={`absolute ${i ? "opacity-0" : ""}`} aria-hidden
+            style={{ left: cq(960 + BETTER_GAP / 2), top: "50%", translate: "0 -50%", color: ACT2_INK }}>
+            {w}
+          </p>
+        ))}
+      </div>
+      <Counter ref={counter} />
+      {/* "not just evolution" and the glitch into "[ revolution ]": the incoming frame, a torn copy of it, the slate flash
+          and the noise lines, all in the layer the glitch shakes. */}
+      <div ref={revLayer} className="pointer-events-none absolute inset-0">
+        <NotJustEvolution ref={evo} />
+        <div ref={rev} className="absolute inset-0 opacity-0" aria-label="[ revolution ]">
+          <RevolutionFrame />
+        </div>
+        <div ref={revBand} className="absolute inset-0 opacity-0" aria-hidden>
+          <RevolutionFrame />
+        </div>
+        <div ref={revSlate} className="absolute inset-0 opacity-0" style={{ background: GLITCH_SLATE }} aria-hidden />
+        <div ref={revNoise} className="absolute inset-0" aria-hidden>
+          {Array.from({ length: NOISE_LINES }, (_, i) => (
+            <div key={i} className="absolute opacity-0" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// "not just evolution" (Figma 266:204), in its final layout from the start, every character hidden: condense types
+// "not just" in and unspools "evolution" out of the dot, letter by letter. Each is its own inline block so it can move.
+function NotJustEvolution({ ref }: { ref?: React.Ref<HTMLDivElement> }) {
+  return (
+    <div ref={ref} className="pointer-events-none absolute inset-0" aria-label={`${NOT_JUST} ${EVO_WORD}`}>
+      <p data-evo-line aria-hidden className="absolute" style={{ ...ACT2_TYPE, left: cq(EVO_LEFT), top: cq(EVO_TOP) }}>
+        {[...NOT_JUST].map((c, i) => (
+          <span key={i} data-type-char className="inline-block whitespace-pre opacity-0">{c}</span>
+        ))}
+        <span data-space className="inline-block whitespace-pre"> </span>
+        <span data-evo-word className="inline-block">
+          {[...EVO_WORD].map((c, i) => (
+            <span key={i} data-evo-letter className="inline-block text-transparent opacity-0"
+              style={{ backgroundImage: EVO_GRADIENT, backgroundClip: "text", WebkitBackgroundClip: "text" }}>
+              {c}
+            </span>
+          ))}
+        </span>
+        {/* TypeText's caret: 0.059em by 0.868em, the text colour at 60%. */}
+        <span data-caret className="absolute opacity-0"
+          style={{ top: "50%", translate: "0 -50%", width: "0.059em", height: "0.868em", borderRadius: 9999,
+            background: `color-mix(in srgb, ${ACT2_INK} 60%, transparent)` }} />
+      </p>
+    </div>
+  );
+}
+
+// "[ revolution ]" (Figma 266:207) on its own dark frame, which the glitch flickers in over "not just evolution".
+function RevolutionFrame() {
+  return (
+    <div className="absolute inset-0" style={{ background: ACT2_BG }}>
+      <p className="absolute" style={{ ...ACT2_TYPE, left: cq(REV_LEFT), top: cq(EVO_TOP) }}>
+        <span>[ r</span>
+        <span className="text-transparent" style={{ backgroundImage: REV_GRADIENT, backgroundClip: "text", WebkitBackgroundClip: "text" }}>
+          evolution ]
+        </span>
+      </p>
+    </div>
+  );
+}
+
+// The counter (Figma 349:1802): the gradient frame "unified" squeezes into, three numbers with their labels and dividers
+// between them, and "(and counting)" under it. condense places the frame (it starts as a solid square) and runs the reels.
+function Counter({ ref }: { ref?: React.Ref<HTMLDivElement> }) {
+  const type: React.CSSProperties = { fontFamily: "var(--font-geist)", fontWeight: 400, lineHeight: "normal", color: ACT2_INK, whiteSpace: "nowrap" };
+  return (
+    <div ref={ref} className="pointer-events-none absolute inset-0" aria-label={`${COUNTS.map((c, i) => `${c} ${COUNT_LABELS[i]}`).join(", ")} ${AND_TEXT}`}>
+      {/* The frame's 8px gradient outline: a gradient border, with the padding box masked out of it (the standard
+          gradient-border trick), so the inside is see-through and its corners follow the frame's as they change. */}
+      <div data-frame className="absolute box-border opacity-0"
+        style={{ border: `${cq(FRAME_STROKE)} solid transparent`, background: `${FRAME_GRADIENT} border-box`,
+          mask: "linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0)" }} />
+      <div aria-hidden className="absolute flex items-center" style={{ left: "50%", top: `calc(50% + ${cq(FRAME_DY)})`, translate: "-50% -50%", gap: cq(80) }}>
+        {COUNTS.map((c, n) => (
+          <Fragment key={n}>
+            {n > 0 && (
+              <div className="self-stretch" style={{ paddingTop: cq(16) }}>
+                <div data-divider className="opacity-0" style={{ width: cq(2), height: cq(96), borderRadius: cq(1), background: ACT2_INK, transformOrigin: "50% 0" }} />
+              </div>
+            )}
+            <div className="flex flex-col items-center" style={{ ...type, width: cq(204), gap: cq(8) }}>
+              {/* Each character is its own reel, a strip of digits that slides up behind a window one line tall. */}
+              <div data-count className="flex opacity-0" style={{ fontSize: cq(96), height: "1.2em", overflow: "hidden", maskImage: REEL_MASK }}>
+                {[...c].map((_, d) => (
+                  <div key={d} data-reel className="flex flex-col items-center">
+                    {reelGlyphs(n, d).map((g, k) => (
+                      <span key={k} style={{ height: "1.2em", lineHeight: "1.2em" }}>{g}</span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <p data-count-label className="opacity-0" style={{ fontSize: cq(48) }}>{COUNT_LABELS[n]}</p>
+            </div>
+          </Fragment>
+        ))}
+      </div>
+      <p data-and className="absolute opacity-0" aria-hidden style={{ ...type, fontSize: cq(64), left: "50%", top: `calc(50% + ${cq(AND_TOP)})`, translate: "-50% 0" }}>
+        {AND_TEXT}
       </p>
     </div>
   );

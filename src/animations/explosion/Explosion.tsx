@@ -18,16 +18,16 @@ export const EXPLOSION_SIZE = [1536, 860] as const;
 export const EXPLOSION_ORIGIN = [734, 450] as const;
 
 // Frames come from Figma (Notch Concept, node 330:49), every fill bound to a tailwind colour variable, export background
-// removed so the holes in the smoke are see-through. The smoke is drawn in tailwind gray (slightly blue); each step is
-// swapped for the neutral step two darker (Liam: same steps read too light). Neutral/950 is the dark stage background,
-// so the darkest two both stop at 900 to stay visible. Fire (amber, yellow, orange) stays as drawn.
-const GRAY_TO_NEUTRAL: Record<string, string> = {
-  "#D1D5DB": "var(--neutral-500)", // gray/300
-  "#9CA3AF": "var(--neutral-600)", // gray/400
-  "#6B7280": "var(--neutral-700)", // gray/500
-  "#4B5563": "var(--neutral-800)", // gray/600, the main smoke
-  "#374151": "var(--neutral-900)", // gray/700
-  "#1F2937": "var(--neutral-900)", // gray/800
+// removed so the holes in the smoke are see-through. The smoke is drawn in tailwind gray, kept on that scale to match the
+// Patterns Act 1 greys (Liam: neutral didn't match), but each step is moved one darker (Liam: same steps read too light,
+// two darker blended into the background). The darkest two both stop at 800. Fire (amber, yellow, orange) stays as drawn.
+const GRAY_DARKER: Record<string, string> = {
+  "#D1D5DB": "var(--gray-400)", // gray/300
+  "#9CA3AF": "var(--gray-500)", // gray/400
+  "#6B7280": "var(--gray-600)", // gray/500
+  "#4B5563": "var(--gray-700)", // gray/600, the main smoke
+  "#374151": "var(--gray-800)", // gray/700
+  "#1F2937": "var(--gray-800)", // gray/800
 };
 
 const raw = import.meta.glob("./frames/*.svg", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
@@ -35,7 +35,7 @@ const FRAMES = Object.keys(raw)
   .sort()
   .map((k) =>
     raw[k]
-      .replace(/fill="(#[0-9a-f]{6})"/gi, (m, hex) => (GRAY_TO_NEUTRAL[hex.toUpperCase()] ? `fill="${GRAY_TO_NEUTRAL[hex.toUpperCase()]}"` : m))
+      .replace(/fill="(#[0-9a-f]{6})"/gi, (m, hex) => (GRAY_DARKER[hex.toUpperCase()] ? `fill="${GRAY_DARKER[hex.toUpperCase()]}"` : m))
       .replace('width="1536" height="860"', 'width="100%" height="100%"'),
   );
 

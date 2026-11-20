@@ -70,14 +70,14 @@
   --stage-muted: var(--muted-foreground);
 }
 
-/* tailwind neutral scale (the one the semantic tokens above come from). The explosion smoke uses these, the same in both
-   themes, as in the Figma frames. */
+/* tailwind gray scale (slightly blue), which is what the Patterns Act 1 greys sit on (Earth, meteor, dinos, jungle). The
+   explosion smoke uses these, the same in both themes, as in the Figma frames. */
 :root {
-  --neutral-500: #737373;
-  --neutral-600: #525252;
-  --neutral-700: #404040;
-  --neutral-800: #262626;
-  --neutral-900: #171717;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
 }
 
 .stage-light {
