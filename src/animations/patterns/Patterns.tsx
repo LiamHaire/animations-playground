@@ -1224,7 +1224,9 @@ function TitleCard({ at, ...p }: ClipProps & { at: number }) {
       const rg: Animation[] = [];
       glitch({ layer: revLayer.current!, incoming: rev.current!, band: revBand.current!, slate: revSlate.current!, noise: [...revNoise.current!.children] as HTMLElement[] },
         { at: at + REV_GLITCH_AT, seed: 23, duration: REV_GLITCH_MS, inkFrom: ACT2_INK, inkTo: ACT2_INK, noiseY: NOISE_Y }, speed, reduced, rg);
-      rg.forEach((a) => (a.startTime = clock.startTime));
+      // Only once the clock has a start time (as goFor does): straight after a replay it is still pending, and setting a
+      // null start time pauses the animation at 0, so the glitch never played.
+      if (clock.startTime !== null) rg.forEach((a) => (a.startTime = clock.startTime));
       squeeze.push(...rg);
       if (clock.playState === "paused") squeeze.forEach((a) => { a.pause(); a.currentTime = clock.currentTime; });
     };
